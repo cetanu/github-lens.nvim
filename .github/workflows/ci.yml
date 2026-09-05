@@ -35,13 +35,30 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
       - name: Install Neovim
         run: sudo apt-get update && sudo apt-get install --yes neovim
-      - uses: taiki-e/install-action@stylua
-      - uses: taiki-e/install-action@selene
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: |
+            stylua
+            selene
       - run: stylua --check .
       - run: selene .
       - run: nvim --headless -u NONE -c 'set noswapfile' -c 'set runtimepath+=.' -c 'luafile tests/test_spec.lua'
+
+  release:
+    name: Prepare or publish release
+    needs: [commitlint, check]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          release-type: simple
+          token: ${{ secrets.GITHUB_TOKEN }}
+          target-branch: master
+          include-component-in-tag: false
