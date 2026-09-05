@@ -1,7 +1,7 @@
-*github-lens.txt*            For Neovim >= 0.10.0            Last change: 2026 September
+*github-lens.txt*        GitHub pull request tools for Neovim >= 0.10
 
-==============================================================================
-Table of Contents                                          *github-lens-contents*
+=============================================================================
+Contents                                                     *github-lens-contents*
 
 1. Overview ............................................... |github-lens-intro|
 2. Requirements ........................................... |github-lens-requirements|
@@ -10,100 +10,84 @@ Table of Contents                                          *github-lens-contents
 5. Lua API ................................................ |github-lens-api|
 6. Keymaps ................................................ |github-lens-keymaps|
 
-==============================================================================
+=============================================================================
 1. Overview                                                   *github-lens-intro*
 
-github-lens.nvim is a lightweight, zero-external-dependency Neovim plugin written
-in stock LuaJIT (Lua 5.1).
+github-lens.nvim finds the pull request for the current Git branch. It shows
+unresolved review comments in buffers or quickfix, and failed or pending
+checks in a status window.
 
-It identifies the active GitHub pull request for the current Git branch and
-fetches:
-- Unresolved PR review comments, projected directly into buffers as inline
-  virtual lines (extmarks) or navigatable in the quickfix list.
-- Failing or pending CI checks, presented in an interactive floating status
-  window with one-key browser navigation.
-
-==============================================================================
+=============================================================================
 2. Requirements                                        *github-lens-requirements*
 
-- Neovim >= 0.10.0 (utilizes native `vim.system()` and `vim.iter()`)
-- `git` CLI (installed and available in $PATH)
-- `gh` CLI (authenticated with `gh auth status`)
+- Neovim >= 0.10
+- `git`
+- Authenticated `gh` (`gh auth status`)
 
-No external Lua libraries (such as plenary.nvim) are required.
-
-==============================================================================
+=============================================================================
 3. Commands                                                 *github-lens-commands*
 
-:GitHubLens [subcommand]                                                  *:GitHubLens*
-    Run a github-lens action. Available subcommands:
-    - refresh  : Query active PR context, comments, and checks asynchronously,
-                 and open/update the bottom status split buffer.
-                 (Default action if invoked without arguments).
-    - checks   : Open or toggle the Neogit-style status split buffer.
-    - status   : Alias for `checks`.
-    - clear    : Clear all virtual lines/extmarks, close status buffer,
-                 and reset internal state.
-    - quickfix : Populate the quickfix list with unresolved comments.
+:GitHubLens [subcommand]                                      *:GitHubLens*
+    Refresh data and open the status window. With a subcommand:
+    - refresh  Refresh pull request comments and checks.
+    - status   Toggle the status window.
+    - checks   Alias for `status`.
+    - quickfix Open unresolved comments in quickfix.
+    - clear    Clear comments and close the status window.
 
-:GitHubLensChecks                                                   *:GitHubLensChecks*
-    Shortcut to open or toggle the Neogit-style status split buffer.
+:GitHubLensChecks                                         *:GitHubLensChecks*
+    Toggle the status window.
 
-==============================================================================
+=============================================================================
 4. Configuration                                              *github-lens-config*
 
-Call `setup()` in your Neovim configuration (e.g. `init.lua`):
 >lua
     require("github-lens").setup({
-      virtual_lines = true,              -- Multi-line virtual lines in buffers
-      comment_hl = "DiagnosticSignInfo",  -- Highlight group for comments
+      virtual_lines = true,
+      comment_hl = "DiagnosticSignInfo",
       keymaps = {
-        toggle_checks = "<leader>pc",    -- Toggle status split buffer
-        refresh = "<leader>pr",          -- Refresh PR data & open split
-        clear = "<leader>px",            -- Clear extmarks & state
+        toggle_checks = "<leader>pc",
+        refresh = "<leader>pr",
+        clear = "<leader>px",
       },
       window = {
-        position = "bottom",             -- Split position ("bottom" or "float")
-        height_ratio = 0.3,              -- Height ratio (30% of screen)
+        position = "bottom",
+        height_ratio = 0.3,
       },
       checks = {
-        show_success = false,            -- Hide SUCCESS checks by default
+        show_success = false,
       },
     })
 <
 
-==============================================================================
+=============================================================================
 5. Lua API                                                       *github-lens-api*
 
-require("github-lens").setup(opts)                                *github-lens.setup()*
-    Configure github-lens with user options.
+require("github-lens").setup(opts)                         *github-lens.setup()*
+    Set plugin options.
 
-require("github-lens").refresh()                                *github-lens.refresh()*
-    Asynchronously queries GitHub for the active PR, comments, and checks,
-    then projects extmarks and opens/updates the bottom status split buffer.
+require("github-lens").refresh()                         *github-lens.refresh()*
+    Refresh pull request comments and checks.
 
-require("github-lens").show_checks()                        *github-lens.show_checks()*
-    Toggles the Neogit-style status split buffer at the bottom 30% of the window.
+require("github-lens").show_checks()                 *github-lens.show_checks()*
+    Toggle the status window.
 
-require("github-lens").status()                                  *github-lens.status()*
+require("github-lens").status()                           *github-lens.status()*
     Alias for `show_checks()`.
 
-require("github-lens").clear()                                    *github-lens.clear()*
-    Removes all comment extmarks across loaded buffers, closes the status
-    window, and clears state.
+require("github-lens").clear()                             *github-lens.clear()*
+    Clear comments and close the status window.
 
-require("github-lens").quickfix()                              *github-lens.quickfix()*
-    Loads all unresolved comments into Neovim's quickfix list and opens it.
+require("github-lens").quickfix()                       *github-lens.quickfix()*
+    Open unresolved comments in quickfix.
 
-==============================================================================
+=============================================================================
 6. Keymaps                                                   *github-lens-keymaps*
 
-Inside the Neogit-Style Status Split Buffer:
-- `<CR>`         : On comments: Jump directly to the file and line.
-                   On checks or URLs: Open the URL in your web browser.
-- `r`            : Refresh PR comments and checks.
-- `q` or `<Esc>` : Close the status split buffer.
+In the status window:
+- <CR>       Jump to a comment or open a URL.
+- r          Refresh comments and checks.
+- q or <Esc> Close the window.
 
-==============================================================================
+=============================================================================
 vim:tw=78:ts=8:ft=help:norl:
-
