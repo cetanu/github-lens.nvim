@@ -1,8 +1,8 @@
-# pr-lens.nvim 🔍
+# github-lens.nvim 🔍
 
 A lightweight, zero-external-dependency Neovim plugin for GitHub pull request workflows. Written in stock **LuaJIT (Lua 5.1)** with **LuaCATS** static typing annotations.
 
-`pr-lens.nvim` brings active GitHub PR context directly into your editor:
+`github-lens.nvim` brings active GitHub PR context directly into your editor:
 - **Unresolved Review Comments**: Projected right inside target buffers as inline virtual lines (`extmarks`) on their respective files and lines, or navigable in the quickfix list.
 - **Failing & Pending CI Checks**: Displayed in an interactive floating popup window with one-key browser navigation (`<CR>`).
 
@@ -33,12 +33,12 @@ A lightweight, zero-external-dependency Neovim plugin for GitHub pull request wo
 
 ```lua
 {
-  "pr-lens.nvim",
-  cmd = { "PRLens", "PRLensChecks" },
+  "github-lens.nvim",
+  cmd = { "GitHubLens", "GitHubLensChecks" },
   keys = {
-    { "<leader>pr", "<cmd>PRLens refresh<cr>", desc = "PR Lens: Refresh PR data" },
-    { "<leader>pc", "<cmd>PRLens checks<cr>", desc = "PR Lens: Toggle CI checks" },
-    { "<leader>px", "<cmd>PRLens clear<cr>", desc = "PR Lens: Clear PR data" },
+    { "<leader>pr", "<cmd>GitHubLens refresh<cr>", desc = "GitHub Lens: Refresh PR data" },
+    { "<leader>pc", "<cmd>GitHubLens checks<cr>", desc = "GitHub Lens: Toggle CI checks" },
+    { "<leader>px", "<cmd>GitHubLens clear<cr>", desc = "GitHub Lens: Clear PR data" },
   },
   opts = {
     virtual_lines = true,
@@ -51,9 +51,9 @@ A lightweight, zero-external-dependency Neovim plugin for GitHub pull request wo
 
 ```lua
 use({
-  "pr-lens.nvim",
+  "github-lens.nvim",
   config = function()
-    require("pr-lens").setup()
+    require("github-lens").setup()
   end,
 })
 ```
@@ -65,7 +65,7 @@ use({
 Pass your custom configuration to `setup()`:
 
 ```lua
-require("pr-lens").setup({
+require("github-lens").setup({
   -- Display multi-line comment bodies as virtual lines below target code
   virtual_lines = true,
 
@@ -99,13 +99,13 @@ require("pr-lens").setup({
 
 | Command | Description |
 |---|---|
-| `:PRLens` | Refresh PR comments & checks, and open/update status split (default) |
-| `:PRLens refresh` | Asynchronously query PR context, review threads, and CI checks |
-| `:PRLens status` | Open / toggle the Neogit-style status split buffer at bottom 30% |
-| `:PRLens checks` | Alias for `:PRLens status` |
-| `:PRLens quickfix` | Populate Neovim's quickfix list with unresolved comments |
-| `:PRLens clear` | Wipe all comment extmarks, close status buffer, and reset state |
-| `:PRLensChecks` | Direct shortcut to open / toggle the status split buffer |
+| `:GitHubLens` | Refresh PR comments & checks, and open/update status split (default) |
+| `:GitHubLens refresh` | Asynchronously query PR context, review threads, and CI checks |
+| `:GitHubLens status` | Open / toggle the Neogit-style status split buffer at bottom 30% |
+| `:GitHubLens checks` | Alias for `:GitHubLens status` |
+| `:GitHubLens quickfix` | Populate Neovim's quickfix list with unresolved comments |
+| `:GitHubLens clear` | Wipe all comment extmarks, close status buffer, and reset state |
+| `:GitHubLensChecks` | Direct shortcut to open / toggle the status split buffer |
 
 ---
 
@@ -124,11 +124,11 @@ Inside the bottom status split window:
 ## 🧩 Architecture
 
 ```text
-pr-lens.nvim/
+github-lens.nvim/
 ├── doc/
-│   └── pr-lens.txt       # Vim help documentation (:help pr-lens)
+│   └── github-lens.txt       # Vim help documentation (:help github-lens)
 ├── lua/
-│   └── pr-lens/
+│   └── github-lens/
 │       ├── init.lua      # User setup, public API, keymaps, commands
 │       ├── types.lua     # Strict LuaCATS typedefs
 │       ├── git.lua       # Git root, current branch, PR detection
@@ -136,7 +136,7 @@ pr-lens.nvim/
 │       ├── comments.lua  # Extmark & virtual text/lines placement in buffers
 │       └── checks.lua    # Floating UI popup renderer for CI checks
 ├── plugin/
-│   └── pr-lens.lua       # Default command registration (:PRLens, :PRLensChecks)
+│   └── github-lens.lua       # Default command registration (:GitHubLens, :GitHubLensChecks)
 ├── .stylua.toml
 └── README.md
 ```

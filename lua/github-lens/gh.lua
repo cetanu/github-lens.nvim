@@ -1,10 +1,10 @@
----@class PRLens.GH
+---@class GitHubLens.GH
 local M = {}
 
 ---Fetch unresolved PR review comments for a pull request via GitHub GraphQL API.
 ---@param pr_number integer Pull request number
 ---@param cwd_or_opts? string|table Directory or options table { cwd?: string, owner?: string, repo?: string }
----@param callback fun(err: string|nil, comments: PRLens.Comment[]|nil) Async callback
+---@param callback fun(err: string|nil, comments: GitHubLens.Comment[]|nil) Async callback
 function M.fetch_unresolved_comments(pr_number, cwd_or_opts, callback)
   local cwd
   local owner = "{owner}"
@@ -100,7 +100,7 @@ query($owner: String!, $repo: String!, $pr: Int!) {
     local threads = (data.repository.pullRequest.reviewThreads and data.repository.pullRequest.reviewThreads.nodes)
       or {}
 
-    ---@type PRLens.Comment[]
+    ---@type GitHubLens.Comment[]
     local comments = {}
 
     for _, thread in ipairs(threads) do
@@ -113,7 +113,7 @@ query($owner: String!, $repo: String!, $pr: Int!) {
         local orig_line = math.floor(tonumber(raw_orig) or 1)
 
         for _, c in ipairs(c_nodes) do
-          ---@type PRLens.Comment
+          ---@type GitHubLens.Comment
           local comment = {
             id = c.id or "",
             author = (c.author and c.author.login) or "ghost",
@@ -139,7 +139,7 @@ end
 ---Fetch failing and pending CI checks for a pull request via GitHub CLI.
 ---@param pr_number integer Pull request number
 ---@param cwd_or_opts? string|table Directory or options table { cwd?: string }
----@param callback fun(err: string|nil, checks: PRLens.Check[]|nil) Async callback
+---@param callback fun(err: string|nil, checks: GitHubLens.Check[]|nil) Async callback
 function M.fetch_checks(pr_number, cwd_or_opts, callback)
   local cwd
   if type(cwd_or_opts) == "table" then
@@ -186,7 +186,7 @@ function M.fetch_checks(pr_number, cwd_or_opts, callback)
       return
     end
 
-    ---@type PRLens.Check[]
+    ---@type GitHubLens.Check[]
     local all_checks = {}
 
     for _, item in ipairs(raw_checks) do
@@ -234,7 +234,7 @@ function M.fetch_checks(pr_number, cwd_or_opts, callback)
         end
       end
 
-      ---@type PRLens.Check
+      ---@type GitHubLens.Check
       local check = {
         name = item.name or "",
         workflow = item.workflow or "",

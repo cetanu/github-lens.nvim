@@ -1,4 +1,4 @@
----@class PRLens.Git
+---@class GitHubLens.Git
 local M = {}
 
 ---Get the top-level root directory of the current git repository.
@@ -68,12 +68,12 @@ function M.get_current_branch(cwd_or_cb, maybe_cb)
 end
 
 ---Fetch the active GitHub pull request context for the current branch.
----@param cwd_or_cb? string|fun(err: string|nil, ctx: PRLens.PRContext|nil) Directory or callback
----@param maybe_cb? fun(err: string|nil, ctx: PRLens.PRContext|nil) Callback if cwd was passed
+---@param cwd_or_cb? string|fun(err: string|nil, ctx: GitHubLens.PRContext|nil) Directory or callback
+---@param maybe_cb? fun(err: string|nil, ctx: GitHubLens.PRContext|nil) Callback if cwd was passed
 function M.get_pr_context(cwd_or_cb, maybe_cb)
   ---@type string|nil
   local cwd
-  ---@type fun(err: string|nil, ctx: PRLens.PRContext|nil)
+  ---@type fun(err: string|nil, ctx: GitHubLens.PRContext|nil)
   local callback
 
   if type(cwd_or_cb) == "function" then
@@ -111,7 +111,7 @@ function M.get_pr_context(cwd_or_cb, maybe_cb)
       return
     end
 
-    ---@type PRLens.PRContext
+    ---@type GitHubLens.PRContext
     local ctx = {
       number = decoded.number,
       title = decoded.title or "",
