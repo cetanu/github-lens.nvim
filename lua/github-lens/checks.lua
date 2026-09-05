@@ -261,10 +261,10 @@ function M.open(checks, ctx, comments, config, repo_root)
     local current_win = vim.api.nvim_get_current_win()
     M._prev_win = current_win
 
-    win = vim.api.nvim_open_win(buf, true, {
-      split = "below",
-      height = height,
-    })
+    vim.cmd("botright split")
+    win = vim.api.nvim_get_current_win()
+    vim.api.nvim_win_set_buf(win, buf)
+    vim.api.nvim_win_set_height(win, height)
     M._win = win
 
     vim.wo[win].number = false
