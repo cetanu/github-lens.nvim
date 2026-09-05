@@ -78,13 +78,22 @@ end
 ---@return table[] virt_lines
 local function build_virt_lines(comment, config)
   local comment_hl = (config and config.comment_hl) or "DiagnosticSignInfo"
+  local prefix = (config and config.symbols and config.symbols.comment_prefix) or "│ "
   local virt_lines = {}
+
+  local bar = vim.trim(prefix)
+  local continuation_prefix
+  if bar == "│" or bar == "|" or bar == "┃" then
+    continuation_prefix = "│   "
+  else
+    continuation_prefix = string.rep(" ", vim.fn.strdisplaywidth(prefix) + 2)
+  end
 
   if config and config.virtual_lines then
     local clean_body = comment.body:gsub("\r\n", "\n")
     local body_lines = vim.split(clean_body, "\n", { plain = true })
 
-    local header = string.format("  💬 @%s: ", comment.author)
+    local header = string.format("%s@%s: ", prefix, comment.author)
     table.insert(virt_lines, {
       { header, comment_hl },
       { body_lines[1] or "", "NormalFloat" },
@@ -92,14 +101,14 @@ local function build_virt_lines(comment, config)
 
     for i = 2, #body_lines do
       table.insert(virt_lines, {
-        { "     ", comment_hl },
+        { continuation_prefix, comment_hl },
         { body_lines[i], "NormalFloat" },
       })
     end
   else
     local single_body = comment.body:gsub("[\r\n]+", " ")
     table.insert(virt_lines, {
-      { string.format("  💬 @%s: ", comment.author), comment_hl },
+      { string.format("%s@%s: ", prefix, comment.author), comment_hl },
       { single_body, "NormalFloat" },
     })
   end

@@ -45,14 +45,29 @@ checks in a status window.
     require("github-lens").setup({
       virtual_lines = true,
       comment_hl = "DiagnosticSignInfo",
+      symbols = {
+        pass = "✔",
+        fail = "✖",
+        pending = "●",
+        cancelled = "⊘",
+        skipped = "⊘",
+        action_required = "▲",
+        section_open = "▾",
+        section_closed = "▸",
+        file_open = "▾",
+        file_closed = "▸",
+        comment_prefix = "│ ",
+      },
       keymaps = {
         toggle_checks = "<leader>pc",
         refresh = "<leader>pr",
         clear = "<leader>px",
       },
       window = {
-        position = "bottom",
+        position = "bottom", -- "bottom" split or "float" centered modal
         height_ratio = 0.3,
+        width_ratio = 0.7,
+        border = "rounded",
       },
       checks = {
         show_success = false,
@@ -85,8 +100,15 @@ require("github-lens").quickfix()                       *github-lens.quickfix()*
 6. Keymaps                                                   *github-lens-keymaps*
 
 In the status window:
-- <CR>       Jump to a comment or open a URL.
+- <CR>       Jump to comment / open URL / toggle fold.
+- <Tab>, za  Toggle fold for current section or file.
+- o          Open URL in browser.
+- y          Yank URL (or comment location) to clipboard.
+- s          Toggle showing passed CI checks.
 - r          Refresh comments and checks.
+- ] / [      Jump to next / previous actionable item.
+- qf         Send unresolved comments to quickfix.
+- ?          Toggle help window.
 - q or <Esc> Close the window.
 
 =============================================================================

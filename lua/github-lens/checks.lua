@@ -7,11 +7,72 @@ M._win = nil
 M._buf = nil
 ---@type integer|nil
 M._prev_win = nil
+---@type integer|nil
+M._help_win = nil
+
+---@type GitHubLens.Check[]
+M._cached_checks = {}
+---@type GitHubLens.PRContext|nil
+M._cached_ctx = nil
+---@type GitHubLens.Comment[]
+M._cached_comments = {}
+---@type GitHubLens.Config|table
+M._cached_config = {}
+---@type string|nil
+M._cached_repo_root = nil
+
+---@type table<string, boolean>
+M._folded_sections = {}
+---@type table<string, boolean>
+M._folded_files = {}
+---@type boolean|nil
+M._show_success_override = nil
+---@type integer[]
+M._action_rows = {}
 
 local checks_ns = vim.api.nvim_create_namespace("github_lens_checks_ui")
 
+local default_symbols = {
+  pass = "✔",
+  fail = "✖",
+  pending = "●",
+  cancelled = "⊘",
+  skipped = "⊘",
+  action_required = "▲",
+  section_open = "▾",
+  section_closed = "▸",
+  file_open = "▾",
+  file_closed = "▸",
+  comment_prefix = "│ ",
+}
+
+local function setup_highlights()
+  local defs = {
+    GitHubLensTitle = { link = "Title", default = true },
+    GitHubLensSection = { link = "Title", default = true },
+    GitHubLensFile = { link = "Directory", default = true },
+    GitHubLensLineNr = { link = "LineNr", default = true },
+    GitHubLensAuthor = { link = "Special", default = true },
+    GitHubLensPass = { link = "DiagnosticOk", default = true },
+    GitHubLensFail = { link = "DiagnosticError", default = true },
+    GitHubLensPending = { link = "DiagnosticWarn", default = true },
+    GitHubLensSkipped = { link = "Comment", default = true },
+    GitHubLensActionRequired = { link = "DiagnosticWarn", default = true },
+    GitHubLensMuted = { link = "Comment", default = true },
+    GitHubLensUrl = { link = "Underlined", default = true },
+  }
+  for name, attrs in pairs(defs) do
+    vim.api.nvim_set_hl(0, name, attrs)
+  end
+end
+
 ---Close the checks and status window if open.
 function M.close()
+  if M._help_win and vim.api.nvim_win_is_valid(M._help_win) then
+    vim.api.nvim_win_close(M._help_win, true)
+  end
+  M._help_win = nil
+
   if M._win and vim.api.nvim_win_is_valid(M._win) then
     vim.api.nvim_win_close(M._win, true)
   end
@@ -23,6 +84,18 @@ function M.close()
   M._prev_win = nil
 end
 
+---Clear cached checks and reset folds.
+function M.clear()
+  M._folded_sections = {}
+  M._folded_files = {}
+  M._show_success_override = nil
+  M._cached_checks = {}
+  M._cached_ctx = nil
+  M._cached_comments = {}
+  M._action_rows = {}
+  M.close()
+end
+
 ---Check if the status window is currently open.
 ---@return boolean
 function M.is_open()
@@ -32,17 +105,20 @@ end
 ---Filter checks according to configuration (default: hide SUCCESS, show all else).
 ---@param all_checks GitHubLens.Check[]
 ---@param cfg? GitHubLens.Config|table
+---@param show_success_override? boolean
 ---@return GitHubLens.Check[]
-function M.filter_checks(all_checks, cfg)
+function M.filter_checks(all_checks, cfg, show_success_override)
   local checks_cfg = (cfg and cfg.checks) or {}
-  local show_success = checks_cfg.show_success == true
+  local show_success = show_success_override
+  if show_success == nil then
+    show_success = checks_cfg.show_success == true
+  end
   local custom_filter = checks_cfg.filter
 
   local filtered = {}
   for _, check in ipairs(all_checks) do
     local keep = true
 
-    -- Default: do not show SUCCESS unless show_success is true
     if not show_success and check.conclusion == "SUCCESS" then
       keep = false
     end
@@ -73,41 +149,114 @@ end
 
 ---Get tag label and highlight group for a check.
 ---@param check GitHubLens.Check
----@return string tag, string hl_group
-local function get_check_tag_and_hl(check)
+---@param symbols GitHubLens.ConfigSymbols
+---@return string sym, string hl_group, string label
+local function get_check_status_info(check, symbols)
   if check.conclusion == "SUCCESS" then
-    return "[PASS]", "DiagnosticOk"
+    return symbols.pass or "✔", "GitHubLensPass", "passed"
   elseif check.conclusion == "CANCELLED" then
-    return "[CANC]", "DiagnosticWarn"
+    return symbols.cancelled or "⊘", "GitHubLensSkipped", "cancelled"
   elseif check.conclusion == "SKIPPED" or check.conclusion == "NEUTRAL" then
-    return "[SKIP]", "Comment"
+    return symbols.skipped or "⊘", "GitHubLensSkipped", "skipped"
   elseif check.conclusion == "FAILURE" or check.conclusion == "START_UP_FAILURE" or check.conclusion == "TIMED_OUT" then
-    return "[FAIL]", "DiagnosticError"
+    local lbl = check.conclusion == "TIMED_OUT" and "timed out" or "failed"
+    return symbols.fail or "✖", "GitHubLensFail", lbl
   elseif check.conclusion == "ACTION_REQUIRED" then
-    return "[ACTN]", "DiagnosticWarn"
+    return symbols.action_required or "▲", "GitHubLensActionRequired", "action required"
   else
-    -- PENDING, IN_PROGRESS, QUEUED, WAITING
-    return "[WAIT]", "DiagnosticWarn"
+    local lbl = (check.status and check.status ~= "") and string.lower(check.status:gsub("_", " ")) or "pending"
+    return symbols.pending or "●", "GitHubLensPending", lbl
   end
 end
 
----Open or update the Neogit-style status buffer in a bottom horizontal split.
----@param checks GitHubLens.Check[]
----@param ctx? GitHubLens.PRContext
----@param comments? GitHubLens.Comment[]
----@param config? GitHubLens.Config|table
----@param repo_root? string
-function M.open(checks, ctx, comments, config, repo_root)
-  checks = checks or {}
-  comments = comments or {}
+---Toggle the floating help window.
+function M.toggle_help()
+  if M._help_win and vim.api.nvim_win_is_valid(M._help_win) then
+    vim.api.nvim_win_close(M._help_win, true)
+    M._help_win = nil
+    return
+  end
 
-  local displayed_checks = M.filter_checks(checks, config)
+  local help_text = {
+    " GitHub Lens Controls",
+    "",
+    " <CR>      Jump to comment / Open URL / Toggle fold",
+    " <Tab>     Toggle fold for section or file",
+    " o         Open URL in browser",
+    " y         Yank URL to system clipboard",
+    " s         Toggle showing passed CI checks",
+    " r         Refresh pull request data",
+    " ] / [     Jump to next / previous item",
+    " qf        Send unresolved comments to quickfix",
+    " q, <Esc>  Close status window",
+    " ?         Close this help window",
+  }
+
+  local hbuf = vim.api.nvim_create_buf(false, true)
+  vim.bo[hbuf].bufhidden = "wipe"
+  vim.bo[hbuf].buftype = "nofile"
+  vim.api.nvim_buf_set_lines(hbuf, 0, -1, false, help_text)
+  vim.bo[hbuf].modifiable = false
+
+  local width = 50
+  local height = #help_text
+  local row = math.max(1, math.floor((vim.o.lines - height) / 2))
+  local col = math.max(1, math.floor((vim.o.columns - width) / 2))
+
+  local hwin = vim.api.nvim_open_win(hbuf, true, {
+    relative = "editor",
+    width = width,
+    height = height,
+    row = row,
+    col = col,
+    style = "minimal",
+    border = "rounded",
+  })
+
+  M._help_win = hwin
+
+  local close_help = function()
+    if M._help_win and vim.api.nvim_win_is_valid(M._help_win) then
+      vim.api.nvim_win_close(M._help_win, true)
+    end
+    M._help_win = nil
+  end
+
+  local kopts = { buffer = hbuf, silent = true, nowait = true }
+  vim.keymap.set("n", "q", close_help, kopts)
+  vim.keymap.set("n", "<Esc>", close_help, kopts)
+  vim.keymap.set("n", "?", close_help, kopts)
+  vim.keymap.set("n", "<CR>", close_help, kopts)
+end
+
+---Render or re-render the status buffer with current state.
+function M.render()
+  local buf = M._buf
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+
+  setup_highlights()
+
+  local checks = M._cached_checks or {}
+  local ctx = M._cached_ctx
+  local comments = M._cached_comments or {}
+  local config = M._cached_config or {}
+  local symbols = vim.tbl_extend("force", default_symbols, (config.symbols or {}))
+
+  local show_success = M._show_success_override
+  if show_success == nil then
+    show_success = config.checks and config.checks.show_success == true
+  end
+
+  local displayed_checks = M.filter_checks(checks, config, show_success)
 
   local lines = {}
-  ---@type table<integer, { type: "url", url: string } | { type: "jump", path: string, line: integer }>
+  ---@type table<integer, { type: string, url?: string, path?: string, line?: integer, section?: string, id?: string }>
   local line_actions = {}
   ---@type table<integer, { col_start: integer, col_end: integer, hl: string }[]>
   local hl_rows = {}
+  M._action_rows = {}
 
   local function add_line(text, highlights, action)
     table.insert(lines, text)
@@ -124,57 +273,112 @@ function M.open(checks, ctx, comments, config, repo_root)
   if ctx then
     local pr_header =
       string.format("PR #%d: %s (%s -> %s)", ctx.number, ctx.title, ctx.head_ref_name, ctx.base_ref_name)
-    add_line(pr_header, { { col_start = 0, col_end = #pr_header, hl = "Title" } })
-
-    if ctx.url and ctx.url ~= "" then
-      local url_line = "  " .. ctx.url
-      add_line(url_line, { { col_start = 2, col_end = #url_line, hl = "Underlined" } }, { type = "url", url = ctx.url })
+    local header_action = (ctx.url and ctx.url ~= "") and { type = "url", url = ctx.url } or nil
+    add_line(pr_header, { { col_start = 0, col_end = #pr_header, hl = "GitHubLensTitle" } }, header_action)
+    if header_action then
+      table.insert(M._action_rows, #lines)
     end
   else
-    add_line("GitHub Lens: No active PR context", { { col_start = 0, col_end = -1, hl = "Title" } })
+    add_line("GitHub Lens: No active PR context", { { col_start = 0, col_end = -1, hl = "GitHubLensTitle" } })
   end
 
   add_line("")
 
   -- 2. CI Checks Section
-  local checks_header
-  if #displayed_checks == #checks then
-    checks_header = string.format("CI Checks (%d)", #displayed_checks)
-  else
-    checks_header = string.format("CI Checks (%d displayed, %d total)", #displayed_checks, #checks)
-  end
-  add_line(checks_header, { { col_start = 0, col_end = #checks_header, hl = "Special" } })
-
-  local sep = string.rep("─", 68)
-  add_line(sep, { { col_start = 0, col_end = #sep, hl = "FloatBorder" } })
-
-  if #displayed_checks == 0 then
-    if #checks > 0 then
-      add_line(string.format("  ✔ All %d checks passed (SUCCESS hidden by default).", #checks), {
-        { col_start = 2, col_end = 5, hl = "DiagnosticOk" },
-      })
-    else
-      add_line("  ✔ No checks reported for this pull request.", {
-        { col_start = 2, col_end = 5, hl = "DiagnosticOk" },
-      })
+  local n_fail = 0
+  local n_pending = 0
+  local n_pass = 0
+  for _, c in ipairs(checks) do
+    if c.conclusion == "FAILURE" or c.conclusion == "START_UP_FAILURE" or c.conclusion == "TIMED_OUT" then
+      n_fail = n_fail + 1
+    elseif c.status == "IN_PROGRESS" or c.status == "QUEUED" or c.status == "WAITING" or c.status == "PENDING" then
+      n_pending = n_pending + 1
+    elseif c.conclusion == "SUCCESS" then
+      n_pass = n_pass + 1
     end
+  end
+
+  local checks_summary
+  if #checks == 0 then
+    checks_summary = "Checks (0)"
+  elseif #checks == n_pass then
+    checks_summary = string.format("Checks (%d) · all passed", #checks)
   else
-    for _, check in ipairs(displayed_checks) do
-      local tag, tag_hl = get_check_tag_and_hl(check)
-      local wf = (check.workflow ~= "" and check.workflow ~= check.name) and string.format(" (%s)", check.workflow)
-        or ""
-      local check_line = string.format("  %s %s%s", tag, check.name, wf)
-      local action = (check.details_url and check.details_url ~= "") and { type = "url", url = check.details_url }
-        or nil
+    local parts = {}
+    if n_fail > 0 then
+      table.insert(parts, string.format("%d failed", n_fail))
+    end
+    if n_pending > 0 then
+      table.insert(parts, string.format("%d in progress", n_pending))
+    end
+    if n_pass > 0 and show_success then
+      table.insert(parts, string.format("%d passed", n_pass))
+    end
+    checks_summary = string.format("Checks (%d) · %s", #displayed_checks, table.concat(parts, ", "))
+  end
 
-      add_line(check_line, { { col_start = 2, col_end = 2 + #tag, hl = tag_hl } }, action)
+  local is_checks_folded = M._folded_sections["checks"] == true
+  local ch_icon = is_checks_folded and (symbols.section_closed or "▸") or (symbols.section_open or "▾")
+  local checks_header_line = string.format("%s %s", ch_icon, checks_summary)
+  add_line(checks_header_line, {
+    { col_start = 0, col_end = #ch_icon, hl = "GitHubLensMuted" },
+    { col_start = #ch_icon + 1, col_end = #checks_header_line, hl = "GitHubLensSection" },
+  }, { type = "section_fold", section = "checks" })
+  table.insert(M._action_rows, #lines)
 
-      if check.details_url and check.details_url ~= "" then
-        local link_line = string.format("         Link: %s", check.details_url)
-        add_line(link_line, {
-          { col_start = 9, col_end = 15, hl = "Comment" },
-          { col_start = 15, col_end = #link_line, hl = "Underlined" },
-        }, { type = "url", url = check.details_url })
+  if not is_checks_folded then
+    if #displayed_checks == 0 then
+      if #checks > 0 then
+        local pass_sym = symbols.pass or "✔"
+        local pass_line = string.format("  %s All %d checks passed (press 's' to show)", pass_sym, #checks)
+        add_line(pass_line, {
+          { col_start = 2, col_end = 2 + #pass_sym, hl = "GitHubLensPass" },
+          { col_start = 2 + #pass_sym + 1, col_end = #pass_line, hl = "GitHubLensMuted" },
+        }, { type = "toggle_success" })
+        table.insert(M._action_rows, #lines)
+      else
+        local pass_sym = symbols.pass or "✔"
+        local no_line = string.format("  %s No checks reported for this pull request", pass_sym)
+        add_line(no_line, {
+          { col_start = 2, col_end = 2 + #pass_sym, hl = "GitHubLensPass" },
+          { col_start = 2 + #pass_sym + 1, col_end = #no_line, hl = "GitHubLensMuted" },
+        })
+      end
+    else
+      local max_name = 14
+      local max_wf = 10
+      for _, c in ipairs(displayed_checks) do
+        if #c.name > max_name then
+          max_name = math.min(28, #c.name)
+        end
+        local wf = (c.workflow ~= "" and c.workflow ~= c.name) and c.workflow or ""
+        if #wf > max_wf then
+          max_wf = math.min(20, #wf)
+        end
+      end
+
+      for _, check in ipairs(displayed_checks) do
+        local sym, sym_hl, label = get_check_status_info(check, symbols)
+        local wf = (check.workflow ~= "" and check.workflow ~= check.name) and check.workflow or ""
+        local check_line =
+          string.format("  %s %-" .. max_name .. "s  %-" .. max_wf .. "s  %s", sym, check.name, wf, label)
+
+        local hls = {
+          { col_start = 2, col_end = 2 + #sym, hl = sym_hl },
+          { col_start = 2 + #sym + 1, col_end = 2 + #sym + 1 + #check.name, hl = "Normal" },
+        }
+        if wf ~= "" then
+          local wf_start = 2 + #sym + 1 + max_name + 2
+          table.insert(hls, { col_start = wf_start, col_end = wf_start + #wf, hl = "GitHubLensMuted" })
+        end
+        local lbl_start = 2 + #sym + 1 + max_name + 2 + max_wf + 2
+        table.insert(hls, { col_start = lbl_start, col_end = lbl_start + #label, hl = sym_hl })
+
+        local action = (check.details_url and check.details_url ~= "")
+            and { type = "url", url = check.details_url, name = check.name }
+          or nil
+        add_line(check_line, hls, action)
+        table.insert(M._action_rows, #lines)
       end
     end
   end
@@ -182,59 +386,97 @@ function M.open(checks, ctx, comments, config, repo_root)
   add_line("")
 
   -- 3. Unresolved Review Comments Section
-  local comments_header = string.format("Unresolved Review Comments (%d)", #comments)
-  add_line(comments_header, { { col_start = 0, col_end = #comments_header, hl = "Special" } })
-  add_line(sep, { { col_start = 0, col_end = #sep, hl = "FloatBorder" } })
-
-  if #comments == 0 then
-    add_line("  ✔ No unresolved review comments!", {
-      { col_start = 2, col_end = 5, hl = "DiagnosticOk" },
-    })
-  else
-    -- Group comments by file
-    local by_file = {}
-    local file_order = {}
-    for _, c in ipairs(comments) do
-      if not by_file[c.path] then
-        by_file[c.path] = {}
-        table.insert(file_order, c.path)
-      end
-      table.insert(by_file[c.path], c)
+  local n_comments = #comments
+  local by_file = {}
+  local file_order = {}
+  for _, c in ipairs(comments) do
+    if not by_file[c.path] then
+      by_file[c.path] = {}
+      table.insert(file_order, c.path)
     end
+    table.insert(by_file[c.path], c)
+  end
 
-    for _, path in ipairs(file_order) do
-      local file_comments = by_file[path]
-      for _, c in ipairs(file_comments) do
-        local file_line = string.format("  📍 %s:%d", c.path, c.line)
-        local jump_action = { type = "jump", path = c.path, line = c.line }
-        add_line(file_line, { { col_start = 2, col_end = #file_line, hl = "Tag" } }, jump_action)
+  local comments_summary
+  if n_comments == 0 then
+    comments_summary = "Review Comments (0)"
+  else
+    local file_suffix = #file_order == 1 and "1 file" or (#file_order .. " files")
+    comments_summary = string.format("Review Comments (%d unresolved in %s)", n_comments, file_suffix)
+  end
 
-        local author_line = string.format("     💬 @%s:", c.author)
-        add_line(author_line, { { col_start = 5, col_end = #author_line, hl = "DiagnosticSignInfo" } }, jump_action)
+  local is_comments_folded = M._folded_sections["comments"] == true
+  local cm_icon = is_comments_folded and (symbols.section_closed or "▸") or (symbols.section_open or "▾")
+  local cm_header_line = string.format("%s %s", cm_icon, comments_summary)
+  add_line(cm_header_line, {
+    { col_start = 0, col_end = #cm_icon, hl = "GitHubLensMuted" },
+    { col_start = #cm_icon + 1, col_end = #cm_header_line, hl = "GitHubLensSection" },
+  }, { type = "section_fold", section = "comments" })
+  table.insert(M._action_rows, #lines)
 
-        local body_lines = vim.split(c.body:gsub("\r\n", "\n"), "\n", { plain = true })
-        for _, bl in ipairs(body_lines) do
-          add_line("        " .. bl, nil, jump_action)
+  if not is_comments_folded then
+    if n_comments == 0 then
+      local pass_sym = symbols.pass or "✔"
+      local no_cm_line = string.format("  %s No unresolved review comments", pass_sym)
+      add_line(no_cm_line, {
+        { col_start = 2, col_end = 2 + #pass_sym, hl = "GitHubLensPass" },
+        { col_start = 2 + #pass_sym + 1, col_end = #no_cm_line, hl = "GitHubLensMuted" },
+      })
+    else
+      for _, path in ipairs(file_order) do
+        local file_comments = by_file[path]
+        local is_file_folded = M._folded_files[path] == true
+        local f_icon = is_file_folded and (symbols.file_closed or "▸") or (symbols.file_open or "▾")
+        local file_line = string.format("  %s %s (%d)", f_icon, path, #file_comments)
+        local f_action = { type = "file_fold", path = path }
+        local f_hls = {
+          { col_start = 2, col_end = 2 + #f_icon, hl = "GitHubLensMuted" },
+          { col_start = 2 + #f_icon + 1, col_end = 2 + #f_icon + 1 + #path, hl = "GitHubLensFile" },
+          { col_start = 2 + #f_icon + 1 + #path + 1, col_end = #file_line, hl = "GitHubLensMuted" },
+        }
+        add_line(file_line, f_hls, f_action)
+        table.insert(M._action_rows, #lines)
+
+        if not is_file_folded then
+          for _, c in ipairs(file_comments) do
+            local jump_action = { type = "jump", path = c.path, line = c.line, url = c.url, id = c.id }
+            local clean_body = c.body:gsub("\r\n", "\n")
+            local body_lines = vim.split(clean_body, "\n", { plain = true })
+            local first_body = body_lines[1] or ""
+            local lnum_str = string.format("%4d", c.line)
+            local author_str = "@" .. c.author
+            local comment_line = string.format("      %s  %s  %s", lnum_str, author_str, first_body)
+
+            local c_hls = {
+              { col_start = 6, col_end = 10, hl = "GitHubLensLineNr" },
+              { col_start = 12, col_end = 12 + #author_str, hl = "GitHubLensAuthor" },
+              { col_start = 12 + #author_str + 2, col_end = #comment_line, hl = "Normal" },
+            }
+            add_line(comment_line, c_hls, jump_action)
+            table.insert(M._action_rows, #lines)
+
+            local indent = "            "
+            for b_idx = 2, #body_lines do
+              local bl = body_lines[b_idx]
+              add_line(indent .. bl, { { col_start = #indent, col_end = #indent + #bl, hl = "Normal" } }, jump_action)
+            end
+          end
         end
-        add_line("")
       end
     end
   end
 
-  -- 4. Footer Section
-  add_line(sep, { { col_start = 0, col_end = #sep, hl = "FloatBorder" } })
-  local help_line = "[<CR>] Jump to code / Open URL  │  [r] Refresh  │  [q] Close"
-  add_line(help_line, { { col_start = 0, col_end = #help_line, hl = "Comment" } })
+  add_line("")
 
-  -- Setup buffer
-  local buf = M._buf
-  if not buf or not vim.api.nvim_buf_is_valid(buf) then
-    buf = vim.api.nvim_create_buf(false, true)
-    vim.bo[buf].bufhidden = "wipe"
-    vim.bo[buf].buftype = "nofile"
-    vim.bo[buf].swapfile = false
-    vim.bo[buf].filetype = "github-lens"
-    M._buf = buf
+  -- 4. Minimal Footer Section
+  local footer_line = "  [?] Help  [<CR>] Jump/Open  [Tab] Fold  [s] Success  [r] Refresh  [q] Close"
+  add_line(footer_line, { { col_start = 2, col_end = #footer_line, hl = "GitHubLensMuted" } }, { type = "help" })
+
+  -- Update buffer
+  local cur_win = M._win
+  local cur_row = 1
+  if cur_win and vim.api.nvim_win_is_valid(cur_win) then
+    cur_row = vim.api.nvim_win_get_cursor(cur_win)[1]
   end
 
   vim.bo[buf].modifiable = true
@@ -252,19 +494,76 @@ function M.open(checks, ctx, comments, config, repo_root)
     end
   end
 
-  -- Determine window placement (defaults to bottom 30% horizontal split)
-  local height_ratio = (config and config.window and config.window.height_ratio) or 0.3
-  local height = math.max(6, math.floor(vim.o.lines * height_ratio))
+  -- Restore cursor safely
+  if cur_win and vim.api.nvim_win_is_valid(cur_win) then
+    local target_row = math.max(1, math.min(cur_row, #lines))
+    pcall(vim.api.nvim_win_set_cursor, cur_win, { target_row, 0 })
+  end
+
+  -- Attach actions map to module for keymap handlers
+  M._line_actions = line_actions
+end
+
+---Open or update the status buffer in a split or float window.
+---@param checks GitHubLens.Check[]
+---@param ctx? GitHubLens.PRContext
+---@param comments? GitHubLens.Comment[]
+---@param config? GitHubLens.Config|table
+---@param repo_root? string
+function M.open(checks, ctx, comments, config, repo_root)
+  M._cached_checks = checks or {}
+  M._cached_ctx = ctx
+  M._cached_comments = comments or {}
+  M._cached_config = config or {}
+  M._cached_repo_root = repo_root
+
+  -- Setup buffer
+  local buf = M._buf
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then
+    buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[buf].bufhidden = "wipe"
+    vim.bo[buf].buftype = "nofile"
+    vim.bo[buf].swapfile = false
+    vim.bo[buf].filetype = "github-lens"
+    M._buf = buf
+  end
+
+  local win_cfg = (config and config.window) or {}
+  local position = win_cfg.position or "bottom"
 
   local win = M._win
   if not win or not vim.api.nvim_win_is_valid(win) then
-    local current_win = vim.api.nvim_get_current_win()
-    M._prev_win = current_win
+    M._prev_win = vim.api.nvim_get_current_win()
 
-    vim.cmd("botright split")
-    win = vim.api.nvim_get_current_win()
-    vim.api.nvim_win_set_buf(win, buf)
-    vim.api.nvim_win_set_height(win, height)
+    if position == "float" then
+      local width_ratio = win_cfg.width_ratio or 0.7
+      local height_ratio = win_cfg.height_ratio or 0.6
+      local width = math.max(40, math.floor(vim.o.columns * width_ratio))
+      local height = math.max(10, math.floor(vim.o.lines * height_ratio))
+      local row = math.max(1, math.floor((vim.o.lines - height) / 2))
+      local col = math.max(1, math.floor((vim.o.columns - width) / 2))
+
+      win = vim.api.nvim_open_win(buf, true, {
+        relative = "editor",
+        width = width,
+        height = height,
+        row = row,
+        col = col,
+        border = win_cfg.border or "rounded",
+        title = " GitHub Lens ",
+        title_pos = "center",
+      })
+    else
+      local height_ratio = win_cfg.height_ratio or 0.3
+      local height = math.max(6, math.floor(vim.o.lines * height_ratio))
+
+      vim.cmd("botright split")
+      win = vim.api.nvim_get_current_win()
+      vim.api.nvim_win_set_buf(win, buf)
+      vim.api.nvim_win_set_height(win, height)
+      vim.wo[win].winfixheight = true
+    end
+
     M._win = win
 
     vim.wo[win].number = false
@@ -273,11 +572,16 @@ function M.open(checks, ctx, comments, config, repo_root)
     vim.wo[win].wrap = false
     vim.wo[win].signcolumn = "no"
     vim.wo[win].spell = false
-    vim.wo[win].winfixheight = true
   else
-    vim.api.nvim_win_set_height(win, height)
+    if position ~= "float" then
+      local height_ratio = win_cfg.height_ratio or 0.3
+      local height = math.max(6, math.floor(vim.o.lines * height_ratio))
+      vim.api.nvim_win_set_height(win, height)
+    end
     vim.api.nvim_win_set_buf(win, buf)
   end
+
+  M.render()
 
   -- Keymaps inside buffer
   local keymap_opts = { buffer = buf, silent = true, nowait = true }
@@ -294,20 +598,119 @@ function M.open(checks, ctx, comments, config, repo_root)
     require("github-lens").refresh()
   end, keymap_opts)
 
+  vim.keymap.set("n", "?", function()
+    M.toggle_help()
+  end, keymap_opts)
+
+  vim.keymap.set("n", "s", function()
+    if M._show_success_override == nil then
+      local default_show = M._cached_config and M._cached_config.checks and M._cached_config.checks.show_success == true
+      M._show_success_override = not default_show
+    else
+      M._show_success_override = not M._show_success_override
+    end
+    M.render()
+    local status_str = M._show_success_override and "showing all checks (including passed)" or "hiding passed checks"
+    vim.notify("[github-lens] CI checks: " .. status_str, vim.log.levels.INFO)
+  end, keymap_opts)
+
+  local function toggle_current_fold()
+    local cur_row = vim.api.nvim_win_get_cursor(win)[1]
+    local action = M._line_actions and M._line_actions[cur_row]
+    if action then
+      if action.type == "section_fold" and action.section then
+        M._folded_sections[action.section] = not M._folded_sections[action.section]
+        M.render()
+        return
+      elseif (action.type == "file_fold" or action.type == "jump") and action.path then
+        M._folded_files[action.path] = not M._folded_files[action.path]
+        M.render()
+        return
+      end
+    end
+  end
+
+  vim.keymap.set("n", "<Tab>", toggle_current_fold, keymap_opts)
+  vim.keymap.set("n", "za", toggle_current_fold, keymap_opts)
+
+  vim.keymap.set("n", "o", function()
+    local cur_row = vim.api.nvim_win_get_cursor(win)[1]
+    local action = M._line_actions and M._line_actions[cur_row]
+    if action and action.url and action.url ~= "" then
+      vim.ui.open(action.url)
+      vim.notify("[github-lens] Opening URL: " .. action.url, vim.log.levels.INFO)
+    else
+      vim.notify("[github-lens] No URL associated with this item", vim.log.levels.INFO)
+    end
+  end, keymap_opts)
+
+  vim.keymap.set("n", "y", function()
+    local cur_row = vim.api.nvim_win_get_cursor(win)[1]
+    local action = M._line_actions and M._line_actions[cur_row]
+    if action and action.url and action.url ~= "" then
+      vim.fn.setreg("+", action.url)
+      vim.fn.setreg('"', action.url)
+      vim.notify("[github-lens] Copied URL to clipboard: " .. action.url, vim.log.levels.INFO)
+    elseif action and action.type == "jump" and action.path then
+      local loc = string.format("%s:%d", action.path, action.line or 1)
+      vim.fn.setreg("+", loc)
+      vim.fn.setreg('"', loc)
+      vim.notify("[github-lens] Copied location to clipboard: " .. loc, vim.log.levels.INFO)
+    else
+      vim.notify("[github-lens] Nothing to yank on this line", vim.log.levels.INFO)
+    end
+  end, keymap_opts)
+
+  vim.keymap.set("n", "]", function()
+    local cur_row = vim.api.nvim_win_get_cursor(win)[1]
+    for _, r in ipairs(M._action_rows) do
+      if r > cur_row then
+        vim.api.nvim_win_set_cursor(win, { r, 0 })
+        return
+      end
+    end
+  end, keymap_opts)
+
+  vim.keymap.set("n", "[", function()
+    local cur_row = vim.api.nvim_win_get_cursor(win)[1]
+    for i = #M._action_rows, 1, -1 do
+      local r = M._action_rows[i]
+      if r < cur_row then
+        vim.api.nvim_win_set_cursor(win, { r, 0 })
+        return
+      end
+    end
+  end, keymap_opts)
+
+  vim.keymap.set("n", "qf", function()
+    require("github-lens").quickfix()
+  end, keymap_opts)
+
   vim.keymap.set("n", "<CR>", function()
     local cursor = vim.api.nvim_win_get_cursor(win)
     local cur_row = cursor[1]
-    local action = line_actions[cur_row]
+    local action = M._line_actions and M._line_actions[cur_row]
 
     if not action then
       vim.notify("[github-lens] No action on this line", vim.log.levels.INFO)
       return
     end
 
-    if action.type == "url" then
+    if action.type == "section_fold" and action.section then
+      M._folded_sections[action.section] = not M._folded_sections[action.section]
+      M.render()
+    elseif action.type == "file_fold" and action.path then
+      M._folded_files[action.path] = not M._folded_files[action.path]
+      M.render()
+    elseif action.type == "toggle_success" then
+      M._show_success_override = true
+      M.render()
+    elseif action.type == "help" then
+      M.toggle_help()
+    elseif action.type == "url" and action.url then
       vim.ui.open(action.url)
       vim.notify("[github-lens] Opening URL: " .. action.url, vim.log.levels.INFO)
-    elseif action.type == "jump" then
+    elseif action.type == "jump" and action.path and action.line then
       local target_win = M._prev_win
       if not target_win or not vim.api.nvim_win_is_valid(target_win) or target_win == win then
         vim.cmd("wincmd k")

@@ -10,6 +10,19 @@ local checks_mod = require("github-lens.checks")
 local default_config = {
   virtual_lines = true,
   comment_hl = "DiagnosticSignInfo",
+  symbols = {
+    pass = "✔",
+    fail = "✖",
+    pending = "●",
+    cancelled = "⊘",
+    skipped = "⊘",
+    action_required = "▲",
+    section_open = "▾",
+    section_closed = "▸",
+    file_open = "▾",
+    file_closed = "▸",
+    comment_prefix = "│ ",
+  },
   keymaps = {
     toggle_checks = "<leader>pc",
     refresh = "<leader>pr",
@@ -18,6 +31,8 @@ local default_config = {
   window = {
     position = "bottom",
     height_ratio = 0.3,
+    width_ratio = 0.7,
+    border = "rounded",
   },
   checks = {
     show_success = false,
@@ -146,7 +161,7 @@ function M.clear()
   M.state.comments = {}
   M.state.checks = {}
   comments_mod.clear()
-  checks_mod.close()
+  checks_mod.clear()
   vim.notify("[github-lens] Cleared comments and checks", vim.log.levels.INFO)
 end
 

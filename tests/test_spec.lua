@@ -374,7 +374,7 @@ local function run_tests()
         original_line = 10,
         is_resolved = false,
         created_at = "2026-09-01",
-        url = "https://github.com/...",
+        url = "https://github.com/org/repo/pull/124#discussion_r1",
       },
     }
 
@@ -393,12 +393,11 @@ local function run_tests()
 
     local lines = vim.api.nvim_buf_get_lines(checks_mod._buf, 0, -1, false)
     assert_true(string.find(lines[1], "PR #124: My PR (feat -> main)", 1, true) ~= nil, "header line")
-    assert_true(string.find(lines[2], "https://github.com/org/repo/pull/124", 1, true) ~= nil, "PR url line")
-    assert_true(string.find(lines[4], "CI Checks (2)", 1, true) ~= nil, "checks section header")
-    assert_true(string.find(lines[6], "[FAIL] test-suite (Unit Tests)", 1, true) ~= nil, "first check fail line")
-    assert_true(string.find(lines[7], "https://github.com/org/repo/actions/runs/12345", 1, true) ~= nil, "link line")
+    assert_true(string.find(lines[3], "Checks (2)", 1, true) ~= nil, "checks section header")
+    assert_true(string.find(lines[4], "test-suite", 1, true) ~= nil, "first check name")
+    assert_true(string.find(lines[4], "failed", 1, true) ~= nil, "first check status")
 
-    -- Test opening URL via CR
+    -- Test opening URL via CR on check line (line 4)
     local opened_url = nil
     local orig_open = vim.ui.open
     ---@diagnostic disable-next-line: duplicate-set-field
@@ -407,10 +406,69 @@ local function run_tests()
       return true
     end
 
-    -- Set cursor on line 6 (the fail check line)
-    vim.api.nvim_win_set_cursor(checks_mod._win, { 6, 0 })
+    vim.api.nvim_win_set_cursor(checks_mod._win, { 4, 0 })
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<CR>", true, false, true), "x", false)
-    assert_eq(opened_url, "https://github.com/org/repo/actions/runs/12345", "opened correct URL on CR")
+    assert_eq(opened_url, "https://github.com/org/repo/actions/runs/12345", "opened check URL on CR")
+
+    -- Test opening URL via 'o'
+    opened_url = nil
+    vim.api.nvim_feedkeys("o", "x", false)
+    assert_eq(opened_url, "https://github.com/org/repo/actions/runs/12345", "opened check URL on o")
+
+    -- Test yanking URL via 'y'
+    vim.api.nvim_feedkeys("y", "x", false)
+    assert_eq(vim.fn.getreg("+"), "https://github.com/org/repo/actions/runs/12345", "yanked URL to clipboard")
+
+    -- Test opening PR URL on header (line 1)
+    vim.api.nvim_win_set_cursor(checks_mod._win, { 1, 0 })
+    opened_url = nil
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<CR>", true, false, true), "x", false)
+    assert_eq(opened_url, "https://github.com/org/repo/pull/124", "opened PR URL on CR on header")
+
+    -- Test section folding via Tab on checks header (line 3)
+    vim.api.nvim_win_set_cursor(checks_mod._win, { 3, 0 })
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Tab>", true, false, true), "x", false)
+    assert_true(checks_mod._folded_sections["checks"] == true, "checks section folded")
+    local folded_lines = vim.api.nvim_buf_get_lines(checks_mod._buf, 0, -1, false)
+    assert_true(string.find(folded_lines[3], "Checks (2)", 1, true) ~= nil, "checks folded line")
+
+    -- Unfold checks section via Tab
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Tab>", true, false, true), "x", false)
+    assert_true(checks_mod._folded_sections["checks"] == false, "checks section unfolded")
+
+    -- Test toggle show_success with 's'
+    vim.api.nvim_feedkeys("s", "x", false)
+    assert_true(checks_mod._show_success_override == true, "show_success toggled on")
+    vim.api.nvim_feedkeys("s", "x", false)
+    assert_true(checks_mod._show_success_override == false, "show_success toggled off")
+
+    -- Test toggle help window with '?'
+    vim.api.nvim_feedkeys("?", "x", false)
+    assert_true(checks_mod._help_win ~= nil and vim.api.nvim_win_is_valid(checks_mod._help_win), "help window opened")
+    checks_mod.toggle_help()
+    assert_true(checks_mod._help_win == nil, "help window closed")
+
+    -- Test comment file folding via Tab
+    local file_row = nil
+    for r, l in ipairs(vim.api.nvim_buf_get_lines(checks_mod._buf, 0, -1, false)) do
+      if string.find(l, "lua/github-lens/init.lua", 1, true) then
+        file_row = r
+        break
+      end
+    end
+    assert_true(file_row ~= nil, "found file row in comments")
+    vim.api.nvim_win_set_cursor(checks_mod._win, { file_row, 0 })
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Tab>", true, false, true), "x", false)
+    assert_true(checks_mod._folded_files["lua/github-lens/init.lua"] == true, "file folded")
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Tab>", true, false, true), "x", false)
+    assert_true(checks_mod._folded_files["lua/github-lens/init.lua"] == false, "file unfolded")
+
+    -- Test floating window mode
+    checks_mod.close()
+    checks_mod.open(sample_checks, ctx, sample_comments, { window = { position = "float", width_ratio = 0.8 } })
+    assert_true(checks_mod._win ~= nil and vim.api.nvim_win_is_valid(checks_mod._win), "float win opened")
+    local win_config = vim.api.nvim_win_get_config(checks_mod._win)
+    assert_eq(win_config.relative, "editor", "window is floating")
 
     vim.ui.open = orig_open
 

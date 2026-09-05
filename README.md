@@ -42,14 +42,29 @@ use({
 require("github-lens").setup({
   virtual_lines = true,
   comment_hl = "DiagnosticSignInfo",
+  symbols = {
+    pass = "✔",
+    fail = "✖",
+    pending = "●",
+    cancelled = "⊘",
+    skipped = "⊘",
+    action_required = "▲",
+    section_open = "▾",
+    section_closed = "▸",
+    file_open = "▾",
+    file_closed = "▸",
+    comment_prefix = "│ ",
+  },
   keymaps = {
     toggle_checks = "<leader>pc",
     refresh = "<leader>pr",
     clear = "<leader>px",
   },
   window = {
-    position = "bottom",
+    position = "bottom", -- "bottom" split or "float" centered modal
     height_ratio = 0.3,
+    width_ratio = 0.7,   -- used when position is "float"
+    border = "rounded",  -- used when position is "float"
   },
   checks = {
     show_success = false,
@@ -69,11 +84,22 @@ require("github-lens").setup({
 | `:GitHubLens clear` | Clear comments and close the status window |
 | `:GitHubLensChecks` | Toggle the status window |
 
-In the status window:
+## Status Window Controls
 
-- `<CR>` jumps to a comment or opens a URL.
-- `r` refreshes the data.
-- `q` and `<Esc>` close the window.
+The status window provides a clean, minimal interface with collapsible sections:
+
+| Key | Action |
+| --- | --- |
+| `<CR>` | Jump to comment in editor / open URL / toggle fold |
+| `<Tab>` / `za` | Toggle fold for current section or file |
+| `o` | Open PR, check, or comment URL in browser |
+| `y` | Yank URL (or comment location) to clipboard |
+| `s` | Toggle showing passed/successful CI checks |
+| `r` | Refresh PR comments and checks |
+| `]` / `[` | Jump to next / previous actionable item |
+| `qf` | Open unresolved comments in quickfix list |
+| `?` | Toggle keymap help window |
+| `q` / `<Esc>` | Close status window |
 
 ## Development
 
