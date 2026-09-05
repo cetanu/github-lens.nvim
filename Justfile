@@ -13,8 +13,7 @@ format:
 
 # Run headless test suite
 test:
-    nvim --headless -u NONE -c 'set runtimepath+=.' -c 'luafile tests/test_spec.lua'
+    nvim --headless -u NONE -c 'set noswapfile' -c 'set runtimepath+=.' -c 'luafile tests/test_spec.lua'
 
 # Run both lint and test
 check: lint test
-
