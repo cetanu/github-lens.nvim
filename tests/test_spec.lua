@@ -470,6 +470,23 @@ local function run_tests()
     local win_config = vim.api.nvim_win_get_config(checks_mod._win)
     assert_eq(win_config.relative, "editor", "window is floating")
 
+    -- Long check metadata should not force the status columns beyond a narrow window.
+    checks_mod.close()
+    checks_mod.open({
+      {
+        name = "build-multi-platform-container-image-and-publish",
+        workflow = "Container release workflow",
+        status = "COMPLETED",
+        conclusion = "FAILURE",
+      },
+    }, ctx, {}, { window = { position = "float", width_ratio = 0.8 } })
+    vim.api.nvim_win_set_width(checks_mod._win, 40)
+    checks_mod.render()
+    local narrow_check_line = vim.api.nvim_buf_get_lines(checks_mod._buf, 3, 4, false)[1]
+    assert_true(vim.fn.strdisplaywidth(narrow_check_line) <= 40, "long check fits narrow window")
+    assert_true(string.find(narrow_check_line, "…", 1, true) ~= nil, "long check name is truncated")
+    assert_true(string.find(narrow_check_line, "failed", 1, true) ~= nil, "status remains visible")
+
     vim.ui.open = orig_open
 
     -- Test close

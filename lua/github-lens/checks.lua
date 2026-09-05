@@ -46,6 +46,27 @@ local default_symbols = {
   comment_prefix = "│ ",
 }
 
+local function display_width(text)
+  return vim.fn.strdisplaywidth(text)
+end
+
+local function truncate_display(text, width)
+  if width <= 0 then
+    return ""
+  end
+  if display_width(text) <= width then
+    return text
+  end
+  if width == 1 then
+    return "…"
+  end
+  return vim.fn.strcharpart(text, 0, width - 1) .. "…"
+end
+
+local function pad_display(text, width)
+  return text .. string.rep(" ", math.max(0, width - display_width(text)))
+end
+
 local function setup_highlights()
   local defs = {
     GitHubLensTitle = { link = "Title", default = true },
@@ -347,31 +368,72 @@ function M.render()
     else
       local max_name = 14
       local max_wf = 10
+      local max_label = 0
+      local max_sym = 1
       for _, c in ipairs(displayed_checks) do
-        if #c.name > max_name then
-          max_name = math.min(28, #c.name)
+        local name_width = display_width(c.name)
+        if name_width > max_name then
+          max_name = math.min(28, name_width)
         end
         local wf = (c.workflow ~= "" and c.workflow ~= c.name) and c.workflow or ""
-        if #wf > max_wf then
-          max_wf = math.min(20, #wf)
+        local wf_width = display_width(wf)
+        if wf_width > max_wf then
+          max_wf = math.min(20, wf_width)
         end
+        local sym, _, label = get_check_status_info(c, symbols)
+        max_label = math.max(max_label, display_width(label))
+        max_sym = math.max(max_sym, display_width(sym))
+      end
+
+      -- Keep the status label visible and make the descriptive columns fit the
+      -- window. Workflow names give up space before check names do.
+      local window_width = 80
+      if M._win and vim.api.nvim_win_is_valid(M._win) then
+        window_width = vim.api.nvim_win_get_width(M._win)
+      end
+      local fixed_width = 2 + max_sym + 1 + 2 + max_label
+      local field_width = math.max(1, window_width - fixed_width)
+      local desired_fields = max_name + 2 + max_wf
+      if desired_fields > field_width then
+        local reduce = desired_fields - field_width
+        local workflow_reduction = math.min(reduce, max_wf)
+        max_wf = max_wf - workflow_reduction
+        max_name = math.max(1, max_name - (reduce - workflow_reduction))
+      end
+
+      if max_name + 2 + max_wf > field_width then
+        max_name = math.max(1, field_width - 2 - max_wf)
+      end
+
+      local function format_check(name_text, workflow_text, label, sym)
+        if max_wf > 0 then
+          return string.format("  %s %s  %s  %s", sym, name_text, workflow_text, label)
+        end
+        return string.format("  %s %s  %s", sym, name_text, label)
       end
 
       for _, check in ipairs(displayed_checks) do
         local sym, sym_hl, label = get_check_status_info(check, symbols)
         local wf = (check.workflow ~= "" and check.workflow ~= check.name) and check.workflow or ""
-        local check_line =
-          string.format("  %s %-" .. max_name .. "s  %-" .. max_wf .. "s  %s", sym, check.name, wf, label)
+        local display_name = truncate_display(check.name, max_name)
+        local display_wf = truncate_display(wf, max_wf)
+        local name_text = pad_display(display_name, max_name)
+        local workflow_text = pad_display(display_wf, max_wf)
+        local check_line = format_check(name_text, workflow_text, label, sym)
 
         local hls = {
           { col_start = 2, col_end = 2 + #sym, hl = sym_hl },
-          { col_start = 2 + #sym + 1, col_end = 2 + #sym + 1 + #check.name, hl = "Normal" },
+          { col_start = 2 + #sym + 1, col_end = 2 + #sym + 1 + #display_name, hl = "Normal" },
         }
-        if wf ~= "" then
-          local wf_start = 2 + #sym + 1 + max_name + 2
-          table.insert(hls, { col_start = wf_start, col_end = wf_start + #wf, hl = "GitHubLensMuted" })
+        if display_wf ~= "" and max_wf > 0 then
+          local wf_start = 2 + #sym + 1 + #name_text + 2
+          table.insert(hls, { col_start = wf_start, col_end = wf_start + #display_wf, hl = "GitHubLensMuted" })
         end
-        local lbl_start = 2 + #sym + 1 + max_name + 2 + max_wf + 2
+        local label_start = 2 + #sym + 1 + #name_text + 2
+        if max_wf > 0 then
+          label_start = label_start + #workflow_text + 2
+        end
+        local lbl_start = label_start
         table.insert(hls, { col_start = lbl_start, col_end = lbl_start + #label, hl = sym_hl })
 
         local action = (check.details_url and check.details_url ~= "")
