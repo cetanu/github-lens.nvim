@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions: {}
+
+jobs:
+  commitlint:
+    name: Lint commit messages
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check pull-request commits
+        if: github.event_name == 'pull_request'
+        uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check pushed commits
+        if: github.event_name == 'push'
+        uses: webiny/action-conventional-commits@v1.3.0
+
+  check:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install Neovim
+        run: sudo apt-get update && sudo apt-get install --yes neovim
+      - uses: taiki-e/install-action@stylua
+      - uses: taiki-e/install-action@selene
+      - run: stylua --check .
+      - run: selene .
+      - run: nvim --headless -u NONE -c 'set noswapfile' -c 'set runtimepath+=.' -c 'luafile tests/test_spec.lua'
