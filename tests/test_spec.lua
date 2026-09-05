@@ -1,4 +1,4 @@
---- Test suite for pr-lens.nvim
+--- Test suite for github-lens.nvim
 local M = {}
 
 local function assert_eq(actual, expected, msg)
@@ -36,18 +36,18 @@ local function run_tests()
     end
   end
 
-  print("Running pr-lens.nvim tests...\n")
+  print("Running github-lens.nvim tests...\n")
 
   -- 1. Modules load cleanly
   test("Modules load without error", function()
-    local pr_lens = require("pr-lens")
-    local git = require("pr-lens.git")
-    local gh = require("pr-lens.gh")
-    local comments = require("pr-lens.comments")
-    local checks = require("pr-lens.checks")
+    local github_lens = require("github-lens")
+    local git = require("github-lens.git")
+    local gh = require("github-lens.gh")
+    local comments = require("github-lens.comments")
+    local checks = require("github-lens.checks")
 
-    assert_true(type(pr_lens.setup) == "function", "pr-lens.setup is a function")
-    assert_true(type(pr_lens.refresh) == "function", "pr-lens.refresh is a function")
+    assert_true(type(github_lens.setup) == "function", "github-lens.setup is a function")
+    assert_true(type(github_lens.refresh) == "function", "github-lens.refresh is a function")
     assert_true(type(git.get_pr_context) == "function", "git.get_pr_context is a function")
     assert_true(type(gh.fetch_unresolved_comments) == "function", "gh.fetch_unresolved_comments is a function")
     assert_true(type(comments.set_comments) == "function", "comments.set_comments is a function")
@@ -56,7 +56,7 @@ local function run_tests()
 
   -- 2. Git context resolution
   test("Git context parses PR JSON correctly", function()
-    local git = require("pr-lens.git")
+    local git = require("github-lens.git")
     local orig_system = vim.system
     local mock_json = vim.json.encode({
       number = 42,
@@ -77,7 +77,7 @@ local function run_tests()
       return {}
     end
 
-    ---@type PRLens.PRContext|nil
+    ---@type GitHubLens.PRContext|nil
     local received_ctx = nil
     git.get_pr_context(function(err, ctx)
       assert_eq(err, nil, "no error")
@@ -98,7 +98,7 @@ local function run_tests()
   end)
 
   test("Git context handles error gracefully", function()
-    local git = require("pr-lens.git")
+    local git = require("github-lens.git")
     local orig_system = vim.system
 
     ---@diagnostic disable-next-line: duplicate-set-field
@@ -127,7 +127,7 @@ local function run_tests()
 
   -- 3. GH API comments query & filtering
   test("GH API parses GraphQL comments and filters unresolved threads", function()
-    local gh = require("pr-lens.gh")
+    local gh = require("github-lens.gh")
     local orig_system = vim.system
 
     local mock_gql_response = vim.json.encode({
@@ -188,7 +188,7 @@ local function run_tests()
       return {}
     end
 
-    ---@type PRLens.Comment[]|nil
+    ---@type GitHubLens.Comment[]|nil
     local comments = nil
     gh.fetch_unresolved_comments(42, nil, function(err, result)
       assert_eq(err, nil, "no error")
@@ -213,7 +213,7 @@ local function run_tests()
 
   -- 4. GH API checks query & filtering
   test("GH API parses CI checks and strictly filters fail and pending", function()
-    local gh = require("pr-lens.gh")
+    local gh = require("github-lens.gh")
     local orig_system = vim.system
 
     local mock_checks_json = vim.json.encode({
@@ -247,7 +247,7 @@ local function run_tests()
       return {}
     end
 
-    ---@type PRLens.Check[]|nil
+    ---@type GitHubLens.Check[]|nil
     local checks = nil
     gh.fetch_checks(42, nil, function(err, result)
       assert_eq(err, nil, "no error")
@@ -271,7 +271,7 @@ local function run_tests()
     assert_eq(checks[4].conclusion, "SKIPPED", "deploy check conclusion")
 
     -- Verify filter_checks default (hides SUCCESS, shows all else)
-    local checks_mod = require("pr-lens.checks")
+    local checks_mod = require("github-lens.checks")
     local default_filtered = checks_mod.filter_checks(checks, { checks = { show_success = false } })
     assert_eq(#default_filtered, 3, "default filter excludes SUCCESS, includes fail/pending/skipped")
 
@@ -286,11 +286,11 @@ local function run_tests()
 
   -- 5. Extmark Buffer Rendering, Virtual Lines & Subdirectory Handling
   test("Buffer comments render extmarks and handle multi-line virtual lines", function()
-    local comments_mod = require("pr-lens.comments")
+    local comments_mod = require("github-lens.comments")
     local ns_id = comments_mod.get_namespace()
 
     local buf = vim.api.nvim_create_buf(false, false)
-    local test_file = "/tmp/pr_lens_test_repo/src/core.lua"
+    local test_file = "/tmp/github_lens_test_repo/src/core.lua"
     vim.api.nvim_buf_set_name(buf, test_file)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
       "local M = {}",
@@ -314,7 +314,7 @@ local function run_tests()
       },
     }
 
-    local repo_root = "/tmp/pr_lens_test_repo"
+    local repo_root = "/tmp/github_lens_test_repo"
     comments_mod.set_comments(fake_comments, repo_root, {
       virtual_lines = true,
       comment_hl = "DiagnosticSignInfo",
@@ -345,7 +345,7 @@ local function run_tests()
 
   -- 6. Checks & Comments Status split UI window, layout, and keymaps
   test("Status UI renders bottom split buffer with checks and comments", function()
-    local checks_mod = require("pr-lens.checks")
+    local checks_mod = require("github-lens.checks")
 
     local sample_checks = {
       {
@@ -369,7 +369,7 @@ local function run_tests()
         id = "c_ui",
         author = "alice",
         body = "Optimize this function",
-        path = "lua/pr-lens/init.lua",
+        path = "lua/github-lens/init.lua",
         line = 10,
         original_line = 10,
         is_resolved = false,
@@ -421,8 +421,8 @@ local function run_tests()
 
   -- 7. End-to-end Setup & Init
   test("setup() applies options and keymaps", function()
-    local pr_lens = require("pr-lens")
-    pr_lens.setup({
+    local github_lens = require("github-lens")
+    github_lens.setup({
       virtual_lines = false,
       comment_hl = "Comment",
       keymaps = {
@@ -432,14 +432,14 @@ local function run_tests()
       },
     })
 
-    assert_eq(pr_lens.config.virtual_lines, false, "virtual_lines option")
-    assert_eq(pr_lens.config.comment_hl, "Comment", "comment_hl option")
-    assert_eq(pr_lens.config.keymaps.refresh, "<leader>tR", "refresh keymap")
+    assert_eq(github_lens.config.virtual_lines, false, "virtual_lines option")
+    assert_eq(github_lens.config.comment_hl, "Comment", "comment_hl option")
+    assert_eq(github_lens.config.keymaps.refresh, "<leader>tR", "refresh keymap")
   end)
 
   -- 8. Subdirectory path resolution test
   test("Subdirectory path matching resolves diff paths correctly", function()
-    local comments_mod = require("pr-lens.comments")
+    local comments_mod = require("github-lens.comments")
     local ns_id = comments_mod.get_namespace()
 
     local root = "/tmp/nested_repo"
@@ -481,13 +481,13 @@ local function run_tests()
 
   -- 9. Quickfix population test
   test("quickfix() populates qflist with unresolved comments", function()
-    local pr_lens = require("pr-lens")
-    pr_lens.state.comments = {
+    local github_lens = require("github-lens")
+    github_lens.state.comments = {
       {
         id = "qf1",
         author = "charlie",
         body = "Needs test coverage",
-        path = "lua/pr-lens/init.lua",
+        path = "lua/github-lens/init.lua",
         line = 15,
         original_line = 15,
         is_resolved = false,
@@ -495,9 +495,9 @@ local function run_tests()
         url = "",
       },
     }
-    pr_lens.state.repo_root = "/tmp/fake_root"
+    github_lens.state.repo_root = "/tmp/fake_root"
 
-    pr_lens.quickfix()
+    github_lens.quickfix()
 
     local qf = vim.fn.getqflist()
     assert_true(#qf >= 1, "quickfix list has items")
@@ -506,18 +506,18 @@ local function run_tests()
   end)
 
   -- 10. Plugin user command registration
-  test("User commands :PRLens and :PRLensChecks exist and execute", function()
-    -- Load plugin/pr-lens.lua
-    dofile("plugin/pr-lens.lua")
+  test("User commands :GitHubLens and :GitHubLensChecks exist and execute", function()
+    -- Load plugin/github-lens.lua
+    dofile("plugin/github-lens.lua")
 
     local commands = vim.api.nvim_get_commands({})
-    assert_true(commands["PRLens"] ~= nil, ":PRLens command registered")
-    assert_true(commands["PRLensChecks"] ~= nil, ":PRLensChecks command registered")
+    assert_true(commands["GitHubLens"] ~= nil, ":GitHubLens command registered")
+    assert_true(commands["GitHubLensChecks"] ~= nil, ":GitHubLensChecks command registered")
   end)
 
   -- 11. Process Non-Blocking Async Verification
   test("refresh() executes asynchronously via vim.system without blocking", function()
-    local pr_lens = require("pr-lens")
+    local github_lens = require("github-lens")
     local orig_system = vim.system
     local calls = {}
 
@@ -558,20 +558,20 @@ local function run_tests()
     end
 
     -- Call refresh()
-    pr_lens.refresh()
+    github_lens.refresh()
 
     -- Execution returns IMMEDIATELY (non-blocking)
     assert_true(#calls >= 1, "refresh launched async command")
 
     -- Wait for all deferred async steps to finish
     vim.wait(300, function()
-      return pr_lens.state.context ~= nil and pr_lens.state.context.number == 99
+      return github_lens.state.context ~= nil and github_lens.state.context.number == 99
     end)
 
     vim.system = orig_system
 
-    assert_true(pr_lens.state.context ~= nil, "context set after async completion")
-    assert_eq(pr_lens.state.context.number, 99, "async context number")
+    assert_true(github_lens.state.context ~= nil, "context set after async completion")
+    assert_eq(github_lens.state.context.number, 99, "async context number")
   end)
 
   print(string.format("\nTest Summary: %d passed, %d failed", passed, failed))

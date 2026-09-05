@@ -1,19 +1,19 @@
-*pr-lens.txt*            For Neovim >= 0.10.0            Last change: 2026 September
+*github-lens.txt*            For Neovim >= 0.10.0            Last change: 2026 September
 
 ==============================================================================
-Table of Contents                                          *pr-lens-contents*
+Table of Contents                                          *github-lens-contents*
 
-1. Overview ............................................... |pr-lens-intro|
-2. Requirements ........................................... |pr-lens-requirements|
-3. Commands ............................................... |pr-lens-commands|
-4. Configuration .......................................... |pr-lens-config|
-5. Lua API ................................................ |pr-lens-api|
-6. Keymaps ................................................ |pr-lens-keymaps|
+1. Overview ............................................... |github-lens-intro|
+2. Requirements ........................................... |github-lens-requirements|
+3. Commands ............................................... |github-lens-commands|
+4. Configuration .......................................... |github-lens-config|
+5. Lua API ................................................ |github-lens-api|
+6. Keymaps ................................................ |github-lens-keymaps|
 
 ==============================================================================
-1. Overview                                                   *pr-lens-intro*
+1. Overview                                                   *github-lens-intro*
 
-pr-lens.nvim is a lightweight, zero-external-dependency Neovim plugin written
+github-lens.nvim is a lightweight, zero-external-dependency Neovim plugin written
 in stock LuaJIT (Lua 5.1).
 
 It identifies the active GitHub pull request for the current Git branch and
@@ -24,7 +24,7 @@ fetches:
   window with one-key browser navigation.
 
 ==============================================================================
-2. Requirements                                        *pr-lens-requirements*
+2. Requirements                                        *github-lens-requirements*
 
 - Neovim >= 0.10.0 (utilizes native `vim.system()` and `vim.iter()`)
 - `git` CLI (installed and available in $PATH)
@@ -33,10 +33,10 @@ fetches:
 No external Lua libraries (such as plenary.nvim) are required.
 
 ==============================================================================
-3. Commands                                                 *pr-lens-commands*
+3. Commands                                                 *github-lens-commands*
 
-:PRLens [subcommand]                                                  *:PRLens*
-    Run a pr-lens action. Available subcommands:
+:GitHubLens [subcommand]                                                  *:GitHubLens*
+    Run a github-lens action. Available subcommands:
     - refresh  : Query active PR context, comments, and checks asynchronously,
                  and open/update the bottom status split buffer.
                  (Default action if invoked without arguments).
@@ -46,15 +46,15 @@ No external Lua libraries (such as plenary.nvim) are required.
                  and reset internal state.
     - quickfix : Populate the quickfix list with unresolved comments.
 
-:PRLensChecks                                                   *:PRLensChecks*
+:GitHubLensChecks                                                   *:GitHubLensChecks*
     Shortcut to open or toggle the Neogit-style status split buffer.
 
 ==============================================================================
-4. Configuration                                              *pr-lens-config*
+4. Configuration                                              *github-lens-config*
 
 Call `setup()` in your Neovim configuration (e.g. `init.lua`):
 >lua
-    require("pr-lens").setup({
+    require("github-lens").setup({
       virtual_lines = true,              -- Multi-line virtual lines in buffers
       comment_hl = "DiagnosticSignInfo",  -- Highlight group for comments
       keymaps = {
@@ -73,30 +73,30 @@ Call `setup()` in your Neovim configuration (e.g. `init.lua`):
 <
 
 ==============================================================================
-5. Lua API                                                       *pr-lens-api*
+5. Lua API                                                       *github-lens-api*
 
-require("pr-lens").setup(opts)                                *pr-lens.setup()*
-    Configure pr-lens with user options.
+require("github-lens").setup(opts)                                *github-lens.setup()*
+    Configure github-lens with user options.
 
-require("pr-lens").refresh()                                *pr-lens.refresh()*
+require("github-lens").refresh()                                *github-lens.refresh()*
     Asynchronously queries GitHub for the active PR, comments, and checks,
     then projects extmarks and opens/updates the bottom status split buffer.
 
-require("pr-lens").show_checks()                        *pr-lens.show_checks()*
+require("github-lens").show_checks()                        *github-lens.show_checks()*
     Toggles the Neogit-style status split buffer at the bottom 30% of the window.
 
-require("pr-lens").status()                                  *pr-lens.status()*
+require("github-lens").status()                                  *github-lens.status()*
     Alias for `show_checks()`.
 
-require("pr-lens").clear()                                    *pr-lens.clear()*
+require("github-lens").clear()                                    *github-lens.clear()*
     Removes all comment extmarks across loaded buffers, closes the status
     window, and clears state.
 
-require("pr-lens").quickfix()                              *pr-lens.quickfix()*
+require("github-lens").quickfix()                              *github-lens.quickfix()*
     Loads all unresolved comments into Neovim's quickfix list and opens it.
 
 ==============================================================================
-6. Keymaps                                                   *pr-lens-keymaps*
+6. Keymaps                                                   *github-lens-keymaps*
 
 Inside the Neogit-Style Status Split Buffer:
 - `<CR>`         : On comments: Jump directly to the file and line.

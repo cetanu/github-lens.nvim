@@ -1,12 +1,12 @@
----@class PRLens
+---@class GitHubLens
 local M = {}
 
-local git = require("pr-lens.git")
-local gh = require("pr-lens.gh")
-local comments_mod = require("pr-lens.comments")
-local checks_mod = require("pr-lens.checks")
+local git = require("github-lens.git")
+local gh = require("github-lens.gh")
+local comments_mod = require("github-lens.comments")
+local checks_mod = require("github-lens.checks")
 
----@type PRLens.Config
+---@type GitHubLens.Config
 local default_config = {
   virtual_lines = true,
   comment_hl = "DiagnosticSignInfo",
@@ -24,10 +24,10 @@ local default_config = {
   },
 }
 
----@type PRLens.Config
+---@type GitHubLens.Config
 M.config = vim.deepcopy(default_config)
 
----@type PRLens.State
+---@type GitHubLens.State
 M.state = {
   context = nil,
   comments = {},
@@ -35,7 +35,7 @@ M.state = {
   repo_root = nil,
 }
 
----Setup pr-lens plugin with user options.
+---Setup github-lens plugin with user options.
 ---@param opts? table User configuration options
 function M.setup(opts)
   if opts then
@@ -49,19 +49,19 @@ function M.setup(opts)
     if M.config.keymaps.refresh and M.config.keymaps.refresh ~= "" then
       vim.keymap.set("n", M.config.keymaps.refresh, function()
         M.refresh()
-      end, { desc = "PR Lens: Refresh PR comments & checks" })
+      end, { desc = "GitHub Lens: Refresh PR comments & checks" })
     end
 
     if M.config.keymaps.toggle_checks and M.config.keymaps.toggle_checks ~= "" then
       vim.keymap.set("n", M.config.keymaps.toggle_checks, function()
         M.show_checks()
-      end, { desc = "PR Lens: Toggle failing CI checks window" })
+      end, { desc = "GitHub Lens: Toggle failing CI checks window" })
     end
 
     if M.config.keymaps.clear and M.config.keymaps.clear ~= "" then
       vim.keymap.set("n", M.config.keymaps.clear, function()
         M.clear()
-      end, { desc = "PR Lens: Clear comments and state" })
+      end, { desc = "GitHub Lens: Clear comments and state" })
     end
   end
 end
@@ -70,7 +70,7 @@ end
 function M.refresh()
   git.get_repo_root(nil, function(root_err, root)
     if root_err or not root then
-      vim.notify("[pr-lens] " .. (root_err or "Not inside a git repository"), vim.log.levels.ERROR)
+      vim.notify("[github-lens] " .. (root_err or "Not inside a git repository"), vim.log.levels.ERROR)
       return
     end
 
@@ -78,13 +78,13 @@ function M.refresh()
 
     git.get_pr_context(root, function(ctx_err, ctx)
       if ctx_err or not ctx then
-        vim.notify("[pr-lens] " .. (ctx_err or "No PR context found"), vim.log.levels.WARN)
+        vim.notify("[github-lens] " .. (ctx_err or "No PR context found"), vim.log.levels.WARN)
         M.clear()
         return
       end
 
       M.state.context = ctx
-      vim.notify(string.format("[pr-lens] Querying PR #%d: %s", ctx.number, ctx.title), vim.log.levels.INFO)
+      vim.notify(string.format("[github-lens] Querying PR #%d: %s", ctx.number, ctx.title), vim.log.levels.INFO)
 
       local pending = 2
       local function on_complete()
@@ -95,7 +95,7 @@ function M.refresh()
           local ch_count = #M.state.checks
           vim.notify(
             string.format(
-              "[pr-lens] Refreshed: %d unresolved comment(s), %d failing/pending check(s)",
+              "[github-lens] Refreshed: %d unresolved comment(s), %d failing/pending check(s)",
               c_count,
               ch_count
             ),
@@ -109,7 +109,7 @@ function M.refresh()
 
       gh.fetch_unresolved_comments(ctx.number, root, function(c_err, comments)
         if c_err then
-          vim.notify("[pr-lens] Failed to fetch comments: " .. c_err, vim.log.levels.WARN)
+          vim.notify("[github-lens] Failed to fetch comments: " .. c_err, vim.log.levels.WARN)
           M.state.comments = {}
         else
           M.state.comments = comments or {}
@@ -119,7 +119,7 @@ function M.refresh()
 
       gh.fetch_checks(ctx.number, root, function(ch_err, checks)
         if ch_err then
-          vim.notify("[pr-lens] Failed to fetch checks: " .. ch_err, vim.log.levels.WARN)
+          vim.notify("[github-lens] Failed to fetch checks: " .. ch_err, vim.log.levels.WARN)
           M.state.checks = {}
         else
           M.state.checks = checks or {}
@@ -147,13 +147,13 @@ function M.clear()
   M.state.checks = {}
   comments_mod.clear()
   checks_mod.close()
-  vim.notify("[pr-lens] Cleared comments and checks", vim.log.levels.INFO)
+  vim.notify("[github-lens] Cleared comments and checks", vim.log.levels.INFO)
 end
 
 ---Populate the quickfix list with all cached unresolved PR comments and open it.
 function M.quickfix()
   if #M.state.comments == 0 then
-    vim.notify("[pr-lens] No unresolved comments found", vim.log.levels.INFO)
+    vim.notify("[github-lens] No unresolved comments found", vim.log.levels.INFO)
     return
   end
 

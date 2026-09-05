@@ -1,4 +1,4 @@
----@class PRLens.ChecksUI
+---@class GitHubLens.ChecksUI
 local M = {}
 
 ---@type integer|nil
@@ -8,7 +8,7 @@ M._buf = nil
 ---@type integer|nil
 M._prev_win = nil
 
-local checks_ns = vim.api.nvim_create_namespace("pr_lens_checks_ui")
+local checks_ns = vim.api.nvim_create_namespace("github_lens_checks_ui")
 
 ---Close the checks and status window if open.
 function M.close()
@@ -30,9 +30,9 @@ function M.is_open()
 end
 
 ---Filter checks according to configuration (default: hide SUCCESS, show all else).
----@param all_checks PRLens.Check[]
----@param cfg? PRLens.Config|table
----@return PRLens.Check[]
+---@param all_checks GitHubLens.Check[]
+---@param cfg? GitHubLens.Config|table
+---@return GitHubLens.Check[]
 function M.filter_checks(all_checks, cfg)
   local checks_cfg = (cfg and cfg.checks) or {}
   local show_success = checks_cfg.show_success == true
@@ -72,7 +72,7 @@ function M.filter_checks(all_checks, cfg)
 end
 
 ---Get tag label and highlight group for a check.
----@param check PRLens.Check
+---@param check GitHubLens.Check
 ---@return string tag, string hl_group
 local function get_check_tag_and_hl(check)
   if check.conclusion == "SUCCESS" then
@@ -92,10 +92,10 @@ local function get_check_tag_and_hl(check)
 end
 
 ---Open or update the Neogit-style status buffer in a bottom horizontal split.
----@param checks PRLens.Check[]
----@param ctx? PRLens.PRContext
----@param comments? PRLens.Comment[]
----@param config? PRLens.Config|table
+---@param checks GitHubLens.Check[]
+---@param ctx? GitHubLens.PRContext
+---@param comments? GitHubLens.Comment[]
+---@param config? GitHubLens.Config|table
 ---@param repo_root? string
 function M.open(checks, ctx, comments, config, repo_root)
   checks = checks or {}
@@ -131,7 +131,7 @@ function M.open(checks, ctx, comments, config, repo_root)
       add_line(url_line, { { col_start = 2, col_end = #url_line, hl = "Underlined" } }, { type = "url", url = ctx.url })
     end
   else
-    add_line("PR Lens: No active PR context", { { col_start = 0, col_end = -1, hl = "Title" } })
+    add_line("GitHub Lens: No active PR context", { { col_start = 0, col_end = -1, hl = "Title" } })
   end
 
   add_line("")
@@ -233,7 +233,7 @@ function M.open(checks, ctx, comments, config, repo_root)
     vim.bo[buf].bufhidden = "wipe"
     vim.bo[buf].buftype = "nofile"
     vim.bo[buf].swapfile = false
-    vim.bo[buf].filetype = "pr-lens"
+    vim.bo[buf].filetype = "github-lens"
     M._buf = buf
   end
 
@@ -291,7 +291,7 @@ function M.open(checks, ctx, comments, config, repo_root)
   end, keymap_opts)
 
   vim.keymap.set("n", "r", function()
-    require("pr-lens").refresh()
+    require("github-lens").refresh()
   end, keymap_opts)
 
   vim.keymap.set("n", "<CR>", function()
@@ -300,13 +300,13 @@ function M.open(checks, ctx, comments, config, repo_root)
     local action = line_actions[cur_row]
 
     if not action then
-      vim.notify("[pr-lens] No action on this line", vim.log.levels.INFO)
+      vim.notify("[github-lens] No action on this line", vim.log.levels.INFO)
       return
     end
 
     if action.type == "url" then
       vim.ui.open(action.url)
-      vim.notify("[pr-lens] Opening URL: " .. action.url, vim.log.levels.INFO)
+      vim.notify("[github-lens] Opening URL: " .. action.url, vim.log.levels.INFO)
     elseif action.type == "jump" then
       local target_win = M._prev_win
       if not target_win or not vim.api.nvim_win_is_valid(target_win) or target_win == win then
@@ -330,10 +330,10 @@ function M.open(checks, ctx, comments, config, repo_root)
 end
 
 ---Toggle the status window.
----@param checks PRLens.Check[]
----@param ctx? PRLens.PRContext
----@param comments? PRLens.Comment[]
----@param config? PRLens.Config|table
+---@param checks GitHubLens.Check[]
+---@param ctx? GitHubLens.PRContext
+---@param comments? GitHubLens.Comment[]
+---@param config? GitHubLens.Config|table
 ---@param repo_root? string
 function M.toggle(checks, ctx, comments, config, repo_root)
   if M._win and vim.api.nvim_win_is_valid(M._win) then

@@ -1,13 +1,13 @@
----@class PRLens.Comments
+---@class GitHubLens.Comments
 local M = {}
 
-local ns_id = vim.api.nvim_create_namespace("pr_lens_comments")
+local ns_id = vim.api.nvim_create_namespace("github_lens_comments")
 
----@type PRLens.Comment[]
+---@type GitHubLens.Comment[]
 M._cached_comments = {}
 ---@type string|nil
 M._repo_root = nil
----@type PRLens.Config
+---@type GitHubLens.Config
 M._config = {
   virtual_lines = true,
   comment_hl = "DiagnosticSignInfo",
@@ -73,8 +73,8 @@ local function buffer_matches_path(bufnr, comment_path, repo_root)
 end
 
 ---Build virtual line structures for a comment.
----@param comment PRLens.Comment
----@param config PRLens.Config
+---@param comment GitHubLens.Comment
+---@param config GitHubLens.Config
 ---@return table[] virt_lines
 local function build_virt_lines(comment, config)
   local comment_hl = (config and config.comment_hl) or "DiagnosticSignInfo"
@@ -144,9 +144,9 @@ function M.render_buffer(bufnr)
 end
 
 ---Store comments and render into all currently loaded buffers.
----@param comments PRLens.Comment[]
+---@param comments GitHubLens.Comment[]
 ---@param repo_root? string
----@param config? PRLens.Config
+---@param config? GitHubLens.Config
 function M.set_comments(comments, repo_root, config)
   M._cached_comments = comments or {}
   if repo_root then
@@ -182,13 +182,13 @@ end
 
 ---Setup autocmd to render comments on BufReadPost.
 function M.setup_autocmds()
-  local augroup = vim.api.nvim_create_augroup("pr_lens_comments", { clear = true })
+  local augroup = vim.api.nvim_create_augroup("github_lens_comments", { clear = true })
   vim.api.nvim_create_autocmd("BufReadPost", {
     group = augroup,
     callback = function(args)
       M.render_buffer(args.buf)
     end,
-    desc = "PR Lens: Render comments on buffer read",
+    desc = "GitHub Lens: Render comments on buffer read",
   })
 end
 
