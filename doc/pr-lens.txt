@@ -1,0 +1,109 @@
+*pr-lens.txt*            For Neovim >= 0.10.0            Last change: 2026 September
+
+==============================================================================
+Table of Contents                                          *pr-lens-contents*
+
+1. Overview ............................................... |pr-lens-intro|
+2. Requirements ........................................... |pr-lens-requirements|
+3. Commands ............................................... |pr-lens-commands|
+4. Configuration .......................................... |pr-lens-config|
+5. Lua API ................................................ |pr-lens-api|
+6. Keymaps ................................................ |pr-lens-keymaps|
+
+==============================================================================
+1. Overview                                                   *pr-lens-intro*
+
+pr-lens.nvim is a lightweight, zero-external-dependency Neovim plugin written
+in stock LuaJIT (Lua 5.1).
+
+It identifies the active GitHub pull request for the current Git branch and
+fetches:
+- Unresolved PR review comments, projected directly into buffers as inline
+  virtual lines (extmarks) or navigatable in the quickfix list.
+- Failing or pending CI checks, presented in an interactive floating status
+  window with one-key browser navigation.
+
+==============================================================================
+2. Requirements                                        *pr-lens-requirements*
+
+- Neovim >= 0.10.0 (utilizes native `vim.system()` and `vim.iter()`)
+- `git` CLI (installed and available in $PATH)
+- `gh` CLI (authenticated with `gh auth status`)
+
+No external Lua libraries (such as plenary.nvim) are required.
+
+==============================================================================
+3. Commands                                                 *pr-lens-commands*
+
+:PRLens [subcommand]                                                  *:PRLens*
+    Run a pr-lens action. Available subcommands:
+    - refresh  : Query active PR context, comments, and checks asynchronously,
+                 and open/update the bottom status split buffer.
+                 (Default action if invoked without arguments).
+    - checks   : Open or toggle the Neogit-style status split buffer.
+    - status   : Alias for `checks`.
+    - clear    : Clear all virtual lines/extmarks, close status buffer,
+                 and reset internal state.
+    - quickfix : Populate the quickfix list with unresolved comments.
+
+:PRLensChecks                                                   *:PRLensChecks*
+    Shortcut to open or toggle the Neogit-style status split buffer.
+
+==============================================================================
+4. Configuration                                              *pr-lens-config*
+
+Call `setup()` in your Neovim configuration (e.g. `init.lua`):
+>lua
+    require("pr-lens").setup({
+      virtual_lines = true,              -- Multi-line virtual lines in buffers
+      comment_hl = "DiagnosticSignInfo",  -- Highlight group for comments
+      keymaps = {
+        toggle_checks = "<leader>pc",    -- Toggle status split buffer
+        refresh = "<leader>pr",          -- Refresh PR data & open split
+        clear = "<leader>px",            -- Clear extmarks & state
+      },
+      window = {
+        position = "bottom",             -- Split position ("bottom" or "float")
+        height_ratio = 0.3,              -- Height ratio (30% of screen)
+      },
+      checks = {
+        show_success = false,            -- Hide SUCCESS checks by default
+      },
+    })
+<
+
+==============================================================================
+5. Lua API                                                       *pr-lens-api*
+
+require("pr-lens").setup(opts)                                *pr-lens.setup()*
+    Configure pr-lens with user options.
+
+require("pr-lens").refresh()                                *pr-lens.refresh()*
+    Asynchronously queries GitHub for the active PR, comments, and checks,
+    then projects extmarks and opens/updates the bottom status split buffer.
+
+require("pr-lens").show_checks()                        *pr-lens.show_checks()*
+    Toggles the Neogit-style status split buffer at the bottom 30% of the window.
+
+require("pr-lens").status()                                  *pr-lens.status()*
+    Alias for `show_checks()`.
+
+require("pr-lens").clear()                                    *pr-lens.clear()*
+    Removes all comment extmarks across loaded buffers, closes the status
+    window, and clears state.
+
+require("pr-lens").quickfix()                              *pr-lens.quickfix()*
+    Loads all unresolved comments into Neovim's quickfix list and opens it.
+
+==============================================================================
+6. Keymaps                                                   *pr-lens-keymaps*
+
+Inside the Neogit-Style Status Split Buffer:
+- `<CR>`         : On comments: Jump directly to the file and line.
+                   On checks or URLs: Open the URL in your web browser.
+- `r`            : Refresh PR comments and checks.
+- `q` or `<Esc>` : Close the status split buffer.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
+
