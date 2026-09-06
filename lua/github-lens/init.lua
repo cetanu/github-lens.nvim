@@ -23,7 +23,7 @@ local default_config = {
     position = "bottom",
     height_ratio = 0.3,
     width_ratio = 0.7,
-    border = "rounded",
+    border = "single",
   },
   checks = {
     show_success = false,

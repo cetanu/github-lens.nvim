@@ -41,7 +41,7 @@
 ---@field position? "bottom" | "float"
 ---@field height_ratio? number Height ratio for bottom split or float (e.g. 0.3 for 30%)
 ---@field width_ratio? number Width ratio for float (e.g. 0.7 for 70%)
----@field border? string | string[] Border style for floating window (default: "rounded")
+---@field border? string | string[] Border style for floating window (default: "single")
 
 ---@class GitHubLens.ConfigChecks
 ---@field show_success? boolean Whether to show SUCCESS checks (default: false)

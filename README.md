@@ -55,7 +55,7 @@ require("github-lens").setup({
     position = "bottom", -- "bottom" split or "float" centered modal
     height_ratio = 0.3,
     width_ratio = 0.7,   -- used when position is "float"
-    border = "rounded",  -- used when position is "float"
+    border = "single",   -- used when position is "float"
   },
   checks = {
     show_success = false,

@@ -232,7 +232,7 @@ function M.toggle_help()
     row = row,
     col = col,
     style = "minimal",
-    border = "rounded",
+    border = "single",
   })
 
   M._help_win = hwin
@@ -612,7 +612,7 @@ function M.open(checks, ctx, comments, config, repo_root)
         height = height,
         row = row,
         col = col,
-        border = win_cfg.border or "rounded",
+        border = win_cfg.border or "single",
         title = " GitHub Lens ",
         title_pos = "center",
       })
