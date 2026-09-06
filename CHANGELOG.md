@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.0](https://github.com/cetanu/github-lens.nvim/compare/v0.2.1...v0.3.0) (2026-09-06)
+
+
+### Features
+
+* persist last status snapshot ([bb68f03](https://github.com/cetanu/github-lens.nvim/commit/bb68f03e01fed715553c295498393d73eeaf1835))
+
+
+### Bug Fixes
+
+* support older neovim cache paths ([fe79071](https://github.com/cetanu/github-lens.nvim/commit/fe79071904b0a1aa86204ebddf86cabd7ba7069d))
+
+
+### Styles
+
+* highlight status titles selectively ([11e4885](https://github.com/cetanu/github-lens.nvim/commit/11e4885226f0c8c002c0d00ecbfc859a160eff76))
+
 ## [0.2.1](https://github.com/cetanu/github-lens.nvim/compare/v0.2.0...v0.2.1) (2026-09-06)
 
 
