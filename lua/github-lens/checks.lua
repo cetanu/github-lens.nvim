@@ -80,13 +80,16 @@ local function setup_highlights()
     GitHubLensPending = { link = "DiagnosticWarn", default = true },
     GitHubLensSkipped = { link = "Comment", default = true },
     GitHubLensActionRequired = { link = "DiagnosticWarn", default = true },
-    GitHubLensFooterKey = { fg = "Purple", bold = true },
     GitHubLensMuted = { link = "Comment", default = true },
     GitHubLensUrl = { link = "Underlined", default = true },
   }
   for name, attrs in pairs(defs) do
     vim.api.nvim_set_hl(0, name, attrs)
   end
+
+  local footer_key_hl = vim.api.nvim_get_hl(0, { name = "GitHubLensSection", link = false })
+  footer_key_hl.bold = true
+  vim.api.nvim_set_hl(0, "GitHubLensFooterKey", footer_key_hl)
 end
 
 ---Close the checks and status window if open.
@@ -294,9 +297,9 @@ function M.render()
   -- 1. PR Header Section
   if ctx then
     local pr_header =
-      string.format("PR #%d: %s (%s -> %s)", ctx.number, ctx.title, ctx.head_ref_name, ctx.base_ref_name)
+      string.format("Pull-Request #%d: %s (%s -> %s)", ctx.number, ctx.title, ctx.head_ref_name, ctx.base_ref_name)
     local header_action = (ctx.url and ctx.url ~= "") and { type = "url", url = ctx.url } or nil
-    add_line(pr_header, { { col_start = 0, col_end = #pr_header, hl = "GitHubLensTitle" } }, header_action)
+    add_line(pr_header, { { col_start = 0, col_end = #"Pull-Request", hl = "GitHubLensSection" } }, header_action)
     if header_action then
       table.insert(M._action_rows, #lines)
     end
@@ -344,7 +347,7 @@ function M.render()
   local checks_header_line = string.format("%s %s", ch_icon, checks_summary)
   add_line(checks_header_line, {
     { col_start = 0, col_end = #ch_icon, hl = "GitHubLensMuted" },
-    { col_start = #ch_icon + 1, col_end = #checks_header_line, hl = "GitHubLensSection" },
+    { col_start = #ch_icon + 1, col_end = #ch_icon + 1 + #"Checks", hl = "GitHubLensSection" },
   }, { type = "section_fold", section = "checks" })
   table.insert(M._action_rows, #lines)
 
@@ -473,7 +476,7 @@ function M.render()
   local cm_header_line = string.format("%s %s", cm_icon, comments_summary)
   add_line(cm_header_line, {
     { col_start = 0, col_end = #cm_icon, hl = "GitHubLensMuted" },
-    { col_start = #cm_icon + 1, col_end = #cm_header_line, hl = "GitHubLensSection" },
+    { col_start = #cm_icon + 1, col_end = #cm_icon + 1 + #"Review Comments", hl = "GitHubLensSection" },
   }, { type = "section_fold", section = "comments" })
   table.insert(M._action_rows, #lines)
 
@@ -546,7 +549,7 @@ function M.render()
     table.insert(footer_parts, item_text)
     table.insert(footer_highlights, {
       col_start = footer_col,
-      col_end = footer_col + #item.key + 2,
+      col_end = footer_col + #item.key,
       hl = item.hl,
     })
     footer_col = footer_col + #item_text
