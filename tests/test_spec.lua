@@ -407,6 +407,37 @@ local function run_tests()
       "second comment follows first comment"
     )
 
+    comments_mod.set_comments(
+      {
+        {
+          id = "c102",
+          author = "reviewer",
+          body = "This is a deliberately long comment that must wrap",
+          path = "src/core.lua",
+          line = 3,
+          original_line = 3,
+          is_resolved = false,
+          created_at = "2026-09-03",
+          url = "",
+        },
+      },
+      repo_root,
+      {
+        virtual_lines = true,
+        comment_hl = "DiagnosticSignInfo",
+        comment_width = 30,
+      }
+    )
+    local wrapped_marks = vim.api.nvim_buf_get_extmarks(buf, ns_id, 0, -1, { details = true })
+    assert_true(#wrapped_marks[1][4].virt_lines > 2, "long comment wraps into multiple virtual lines")
+    for _, virt_line in ipairs(wrapped_marks[1][4].virt_lines) do
+      local rendered = ""
+      for _, chunk in ipairs(virt_line) do
+        rendered = rendered .. chunk[1]
+      end
+      assert_true(vim.fn.strdisplaywidth(rendered) <= 30, "wrapped virtual line fits configured width")
+    end
+
     -- Test persistence across reload and clear
     comments_mod.render_buffer(buf)
     local marks_after_reload = vim.api.nvim_buf_get_extmarks(buf, ns_id, 0, -1, { details = true })

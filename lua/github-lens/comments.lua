@@ -5,6 +5,7 @@ local ns_id = vim.api.nvim_create_namespace("github_lens_comments")
 
 ---@type GitHubLens.Comment[]
 M._cached_comments = {}
+---@type table<string, boolean>
 ---@type string|nil
 M._repo_root = nil
 ---@type GitHubLens.Config
@@ -79,6 +80,7 @@ local function build_virt_lines(comment, config)
   local comment_hl = (config and config.comment_hl) or "DiagnosticSignInfo"
   local prefix = (config and config.symbols and config.symbols.comment_prefix) or "│ "
   local virt_lines = {}
+  local max_width = math.max(20, (config and config.comment_width) or 80)
 
   local bar = vim.trim(prefix)
   local continuation_prefix
@@ -88,28 +90,76 @@ local function build_virt_lines(comment, config)
     continuation_prefix = string.rep(" ", vim.fn.strdisplaywidth(prefix) + 2)
   end
 
+  ---Wrap a display line without splitting words unless a word is too long.
+  ---@param text string
+  ---@param width integer
+  ---@return string[]
+  local function wrap_line(text, width)
+    if width <= 0 or vim.fn.strdisplaywidth(text) <= width then
+      return { text }
+    end
+
+    local result = {}
+    local current = ""
+    for word in text:gmatch("%S+") do
+      local candidate = current == "" and word or (current .. " " .. word)
+      if vim.fn.strdisplaywidth(candidate) <= width then
+        current = candidate
+      else
+        if current ~= "" then
+          table.insert(result, current)
+        end
+        while vim.fn.strdisplaywidth(word) > width do
+          local chunk = vim.fn.strcharpart(word, 0, width)
+          table.insert(result, chunk)
+          word = vim.fn.strcharpart(word, vim.fn.strchars(chunk))
+        end
+        current = word
+      end
+    end
+    if current ~= "" or #result == 0 then
+      table.insert(result, current)
+    end
+    return result
+  end
+
+  local function add_wrapped_body_lines(body, prefix_text)
+    local available = math.max(1, max_width - vim.fn.strdisplaywidth(prefix_text))
+    for _, logical_line in ipairs(vim.split(body, "\n", { plain = true })) do
+      if vim.trim(logical_line) ~= "" then
+        for _, wrapped in ipairs(wrap_line(logical_line, available)) do
+          table.insert(virt_lines, {
+            { prefix_text, comment_hl },
+            { wrapped, "NormalFloat" },
+          })
+          prefix_text = continuation_prefix
+          available = math.max(1, max_width - vim.fn.strdisplaywidth(prefix_text))
+        end
+      end
+    end
+  end
+
   if config and config.virtual_lines then
     local clean_body = comment.body:gsub("\r\n", "\n")
-    local body_lines = vim.split(clean_body, "\n", { plain = true })
-
     local header = string.format("%s@%s: ", prefix, comment.author)
-    table.insert(virt_lines, {
-      { header, comment_hl },
-      { body_lines[1] or "", "NormalFloat" },
-    })
-
-    for i = 2, #body_lines do
-      table.insert(virt_lines, {
-        { continuation_prefix, comment_hl },
-        { body_lines[i], "NormalFloat" },
-      })
-    end
+    add_wrapped_body_lines(clean_body, header)
   else
     local single_body = comment.body:gsub("[\r\n]+", " ")
-    table.insert(virt_lines, {
-      { string.format("%s@%s: ", prefix, comment.author), comment_hl },
-      { single_body, "NormalFloat" },
+    add_wrapped_body_lines(single_body, string.format("%s@%s: ", prefix, comment.author))
+  end
+
+  local preview_lines = (config and config.comment_preview_lines) or 3
+  if #virt_lines > preview_lines then
+    local hidden_count = #virt_lines - preview_lines
+    local preview = {}
+    for i = 1, preview_lines do
+      table.insert(preview, virt_lines[i])
+    end
+    table.insert(preview, {
+      { continuation_prefix, comment_hl },
+      { string.format("… %d lines hidden", hidden_count), "Comment" },
     })
+    virt_lines = preview
   end
 
   return virt_lines

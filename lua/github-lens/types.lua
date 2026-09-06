@@ -51,6 +51,8 @@
 ---@class GitHubLens.Config
 ---@field virtual_lines? boolean Show multi-line comment bodies as virtual lines below target code
 ---@field comment_hl? string Highlight group for comment boundaries
+---@field comment_width? integer Maximum display width of virtual comment lines
+---@field comment_preview_lines? integer Number of non-blank virtual preview lines before details are summarized
 ---@field symbols? GitHubLens.ConfigSymbols Custom symbols/icons for UI
 ---@field window? GitHubLens.ConfigWindow
 ---@field checks? GitHubLens.ConfigChecks

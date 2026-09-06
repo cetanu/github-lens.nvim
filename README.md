@@ -42,6 +42,8 @@ use({
 require("github-lens").setup({
   virtual_lines = true,
   comment_hl = "DiagnosticSignInfo",
+  comment_width = 80,
+  comment_preview_lines = 3,
   symbols = {
     pass = "✔",
     fail = "✖",
@@ -91,6 +93,12 @@ The status window provides a interface with collapsible sections:
 | `]` / `[`     | Jump to next / previous actionable item     |
 | `qf`          | Open unresolved comments in quickfix list   |
 | `q` / `<Esc>` | Close window                                |
+
+Virtual comment lines are wrapped at `comment_width` (80 by default). Native
+Vim folds cannot fold these lines because they are display-only virtual lines;
+comments longer than `comment_preview_lines` (3 by default) show a compact
+preview in the source buffer. Whitespace-only body lines are omitted from the
+preview, and the status window remains the full-detail view.
 
 ## Development
 

@@ -43,6 +43,8 @@ checks in a status window.
     require("github-lens").setup({
       virtual_lines = true,
       comment_hl = "DiagnosticSignInfo",
+      comment_width = 80,
+      comment_preview_lines = 3,
       symbols = {
         pass = "✔",
         fail = "✖",
@@ -69,6 +71,12 @@ checks in a status window.
 
 require("github-lens").setup(opts)                         *github-lens.setup()*
     Set plugin options.
+
+    comment_width controls the maximum display width of virtual comment lines
+    (default: 80). comment_preview_lines controls how many virtual lines are
+    shown before a long comment is summarized (default: 3). Whitespace-only
+    body lines are omitted from the virtual preview. The status window
+    displays the full comment detail.
 
 require("github-lens").refresh()                         *github-lens.refresh()*
     Refresh pull request comments and checks.

@@ -61,6 +61,8 @@ end
 local default_config = {
   virtual_lines = true,
   comment_hl = "DiagnosticSignInfo",
+  comment_width = 80,
+  comment_preview_lines = 3,
   symbols = {
     pass = "✔",
     fail = "✖",
