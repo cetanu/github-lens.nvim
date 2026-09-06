@@ -6,6 +6,56 @@ local gh = require("github-lens.gh")
 local comments_mod = require("github-lens.comments")
 local checks_mod = require("github-lens.checks")
 
+local function status_cache_path()
+  return vim.fs.joinpath(vim.fn.stdpath("state"), "github-lens", "status.json")
+end
+
+---@param repo_root string
+---@return GitHubLens.Status|nil
+local function load_cached_status(repo_root)
+  local ok, lines = pcall(vim.fn.readfile, status_cache_path())
+  if not ok or #lines == 0 then
+    return nil
+  end
+
+  local decoded_ok, cache = pcall(vim.json.decode, table.concat(lines, "\n"))
+  if not decoded_ok or type(cache) ~= "table" then
+    return nil
+  end
+
+  local status = cache[repo_root]
+  if type(status) ~= "table" or type(status.context) ~= "table" then
+    return nil
+  end
+
+  return status
+end
+
+---@param status GitHubLens.Status
+local function save_cached_status(status)
+  local path = status_cache_path()
+  local cache_dir = vim.fs.dirname(path)
+  local ok = pcall(vim.fn.mkdir, cache_dir, "p")
+  if not ok then
+    return
+  end
+
+  local read_ok, lines = pcall(vim.fn.readfile, path)
+  local cache = {}
+  if read_ok and #lines > 0 then
+    local decode_ok, decoded = pcall(vim.json.decode, table.concat(lines, "\n"))
+    if decode_ok and type(decoded) == "table" then
+      cache = decoded
+    end
+  end
+
+  cache[status.repo_root] = status
+  local encode_ok, encoded = pcall(vim.json.encode, cache)
+  if encode_ok then
+    pcall(vim.fn.writefile, { encoded }, path)
+  end
+end
+
 ---@type GitHubLens.Config
 local default_config = {
   virtual_lines = true,
@@ -39,6 +89,7 @@ M.state = {
   comments = {},
   checks = {},
   repo_root = nil,
+  last_status = nil,
 }
 
 ---Setup github-lens plugin with user options.
@@ -61,6 +112,11 @@ end
 
 ---Fetch PR context, comments, and checks asynchronously and update UI.
 function M.refresh()
+  local last_status = M.state.last_status
+  if last_status then
+    checks_mod.open(last_status.checks, last_status.context, last_status.comments, M.config, last_status.repo_root)
+  end
+
   git.get_repo_root(nil, function(root_err, root)
     if root_err or not root then
       vim.notify("[github-lens] " .. (root_err or "Not inside a git repository"), vim.log.levels.ERROR)
@@ -68,6 +124,15 @@ function M.refresh()
     end
 
     M.state.repo_root = root
+
+    last_status = M.state.last_status
+    if not last_status or last_status.repo_root ~= root then
+      last_status = load_cached_status(root)
+      M.state.last_status = last_status
+      if last_status then
+        checks_mod.open(last_status.checks, last_status.context, last_status.comments, M.config, root)
+      end
+    end
 
     git.get_pr_context(root, function(ctx_err, ctx)
       if ctx_err or not ctx then
@@ -84,6 +149,13 @@ function M.refresh()
         pending = pending - 1
         if pending == 0 then
           comments_mod.set_comments(M.state.comments, root, M.config)
+          M.state.last_status = {
+            context = vim.deepcopy(M.state.context),
+            comments = vim.deepcopy(M.state.comments),
+            checks = vim.deepcopy(M.state.checks),
+            repo_root = root,
+          }
+          save_cached_status(M.state.last_status)
           local c_count = #M.state.comments
           local ch_count = #M.state.checks
           vim.notify(
@@ -140,6 +212,7 @@ function M.clear()
   M.state.checks = {}
   comments_mod.clear()
   checks_mod.clear()
+  M.state.last_status = nil
   vim.notify("[github-lens] Cleared comments and checks", vim.log.levels.INFO)
 end
 

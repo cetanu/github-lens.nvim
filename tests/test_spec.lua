@@ -391,7 +391,7 @@ local function run_tests()
     assert_true(checks_mod._buf ~= nil and vim.api.nvim_buf_is_valid(checks_mod._buf), "buf is valid")
 
     local lines = vim.api.nvim_buf_get_lines(checks_mod._buf, 0, -1, false)
-    assert_true(string.find(lines[1], "PR #124: My PR (feat -> main)", 1, true) ~= nil, "header line")
+    assert_true(string.find(lines[1], "#124: My PR (feat -> main)", 1, true) ~= nil, "header line")
     assert_true(string.find(lines[3], "Checks (2)", 1, true) ~= nil, "checks section header")
     assert_true(string.find(lines[4], "test-suite", 1, true) ~= nil, "first check name")
     assert_true(string.find(lines[4], "failed", 1, true) ~= nil, "first check status")
@@ -636,20 +636,43 @@ local function run_tests()
     end
 
     -- Call refresh()
+    github_lens.state.last_status = {
+      context = {
+        number = 98,
+        title = "Cached PR",
+        url = "https://github.com/...",
+        head_ref_name = "cached",
+        base_ref_name = "main",
+      },
+      comments = {},
+      checks = {},
+      repo_root = "/tmp/repo",
+    }
     github_lens.refresh()
 
     -- Execution returns IMMEDIATELY (non-blocking)
     assert_true(#calls >= 1, "refresh launched async command")
+    local cached_lines = vim.api.nvim_buf_get_lines(require("github-lens.checks")._buf, 0, 1, false)
+    assert_true(
+      string.find(cached_lines[1] or "", "#98: Cached PR", 1, true) ~= nil,
+      "cached status renders immediately"
+    )
 
     -- Wait for all deferred async steps to finish
     vim.wait(300, function()
-      return github_lens.state.context ~= nil and github_lens.state.context.number == 99
+      return github_lens.state.last_status ~= nil and github_lens.state.last_status.context.number == 99
     end)
 
     vim.system = orig_system
 
     assert_true(github_lens.state.context ~= nil, "context set after async completion")
     assert_eq(github_lens.state.context.number, 99, "async context number")
+    local refreshed_lines = vim.api.nvim_buf_get_lines(require("github-lens.checks")._buf, 0, 1, false)
+    assert_true(
+      string.find(refreshed_lines[1] or "", "#99: Async PR", 1, true) ~= nil,
+      "fresh status replaces cached status"
+    )
+    assert_eq(github_lens.state.last_status.context.number, 99, "last status snapshot updated")
   end)
 
   print(string.format("\nTest Summary: %d passed, %d failed", passed, failed))

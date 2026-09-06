@@ -54,10 +54,17 @@
 ---@field window? GitHubLens.ConfigWindow
 ---@field checks? GitHubLens.ConfigChecks
 
+---@class GitHubLens.Status
+---@field context GitHubLens.PRContext
+---@field comments GitHubLens.Comment[]
+---@field checks GitHubLens.Check[]
+---@field repo_root string
+
 ---@class GitHubLens.State
 ---@field context GitHubLens.PRContext|nil
 ---@field comments GitHubLens.Comment[]
 ---@field checks GitHubLens.Check[]
 ---@field repo_root string|nil
+---@field last_status GitHubLens.Status|nil Last successfully fetched status snapshot
 
 return {}
