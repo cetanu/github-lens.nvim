@@ -137,6 +137,7 @@ local function run_tests()
             reviewThreads = {
               nodes = {
                 {
+                  id = "thread-resolved",
                   isResolved = true,
                   path = "lua/foo.lua",
                   line = 10,
@@ -147,6 +148,7 @@ local function run_tests()
                   },
                 },
                 {
+                  id = "thread-open",
                   isResolved = false,
                   path = "lua/bar.lua",
                   line = 25,
@@ -203,12 +205,59 @@ local function run_tests()
     assert(comments ~= nil, "comments received")
     assert_eq(#comments, 2, "only 2 unresolved comments (top + reply)")
     assert_eq(comments[1].id, "c2", "comment 1 id")
+    assert_eq(comments[1].thread_id, "thread-open", "thread id is populated")
     assert_eq(comments[1].author, "bob", "comment 1 author")
     assert_eq(comments[1].path, "lua/bar.lua", "comment 1 path")
     assert_eq(comments[1].line, 25, "comment 1 line")
     assert_eq(comments[2].id, "c3", "comment 2 id")
     assert_eq(comments[2].author, "carol", "comment 2 author")
     assert_eq(comments[2].body, "Reply to first comment", "comment 2 body")
+  end)
+
+  test("GH API mutations use gh api graphql", function()
+    local gh = require("github-lens.gh")
+    local orig_system = vim.system
+    local commands = {}
+
+    ---@diagnostic disable-next-line: duplicate-set-field
+    vim.system = function(cmd, _opts, on_exit)
+      table.insert(commands, cmd)
+      on_exit({ code = 0, stdout = vim.json.encode({ data = { ok = true } }), stderr = "" })
+      return {}
+    end
+
+    local reply_done = false
+    gh.reply_to_thread("thread-1", "Please update this", "/tmp/repo", function(err)
+      assert_eq(err, nil, "reply succeeds")
+      reply_done = true
+    end)
+    vim.wait(100, function()
+      return reply_done
+    end)
+
+    local resolve_done = false
+    gh.resolve_thread("thread-1", "/tmp/repo", function(err)
+      assert_eq(err, nil, "resolve succeeds")
+      resolve_done = true
+    end)
+    vim.wait(100, function()
+      return resolve_done
+    end)
+    vim.system = orig_system
+
+    assert_eq(#commands, 2, "two mutations invoked")
+    for _, cmd in ipairs(commands) do
+      assert_eq(cmd[1], "gh", "mutation binary")
+      assert_eq(cmd[2], "api", "mutation subcommand")
+      assert_eq(cmd[3], "graphql", "mutation endpoint")
+      local found_thread = false
+      for _, arg in ipairs(cmd) do
+        if arg == "thread_id=thread-1" then
+          found_thread = true
+        end
+      end
+      assert_true(found_thread, "thread ID passed as a CLI variable")
+    end
   end)
 
   -- 4. GH API checks query & filtering

@@ -210,7 +210,8 @@ function M.toggle_help()
     " <Tab>     Toggle fold for section or file",
     " y         Yank URL to system clipboard",
     " s         Toggle showing passed CI checks",
-    " r         Refresh pull request data",
+    " r         Refresh / open reply buffer",
+    " x         Resolve current comment thread",
     " ] / [     Jump to next / previous item",
     " qf        Send unresolved comments to quickfix",
     " q, <Esc>  Close status window",
@@ -684,7 +685,37 @@ function M.open(checks, ctx, comments, config, repo_root)
   end, keymap_opts)
 
   vim.keymap.set("n", "r", function()
+    local action = M._line_actions and M._line_actions[vim.api.nvim_win_get_cursor(win)[1]]
+    if action and action.type == "jump" then
+      local target_win = M._prev_win
+      if target_win and vim.api.nvim_win_is_valid(target_win) then
+        vim.api.nvim_set_current_win(target_win)
+        local root = M._cached_repo_root or vim.fn.getcwd()
+        vim.cmd("edit " .. vim.fn.fnameescape(vim.fs.normalize(root .. "/" .. action.path)))
+        local line_count = vim.api.nvim_buf_line_count(0)
+        vim.api.nvim_win_set_cursor(target_win, { math.max(1, math.min(action.line or 1, line_count)), 0 })
+        require("github-lens").reply()
+        return
+      end
+    end
     require("github-lens").refresh()
+  end, keymap_opts)
+
+  vim.keymap.set("n", "x", function()
+    local action = M._line_actions and M._line_actions[vim.api.nvim_win_get_cursor(win)[1]]
+    if action and action.type == "jump" then
+      local target_win = M._prev_win
+      if target_win and vim.api.nvim_win_is_valid(target_win) then
+        vim.api.nvim_set_current_win(target_win)
+        local root = M._cached_repo_root or vim.fn.getcwd()
+        vim.cmd("edit " .. vim.fn.fnameescape(vim.fs.normalize(root .. "/" .. action.path)))
+        local line_count = vim.api.nvim_buf_line_count(0)
+        vim.api.nvim_win_set_cursor(target_win, { math.max(1, math.min(action.line or 1, line_count)), 0 })
+        require("github-lens").resolve()
+        return
+      end
+    end
+    vim.notify("[github-lens] Place the cursor on a comment first", vim.log.levels.INFO)
   end, keymap_opts)
 
   vim.keymap.set("n", "?", function()

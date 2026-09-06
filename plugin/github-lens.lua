@@ -16,6 +16,12 @@ local subcommands = {
   quickfix = function()
     require("github-lens").quickfix()
   end,
+  reply = function()
+    require("github-lens").reply()
+  end,
+  resolve = function()
+    require("github-lens").resolve()
+  end,
 }
 
 vim.api.nvim_create_user_command("GitHubLens", function(opts)
@@ -26,7 +32,10 @@ vim.api.nvim_create_user_command("GitHubLens", function(opts)
     subcommands[arg]()
   else
     vim.notify(
-      string.format("[github-lens] Unknown subcommand: '%s'. Valid options: refresh, status, clear, quickfix", arg),
+      string.format(
+        "[github-lens] Unknown subcommand: '%s'. Valid options: refresh, status, reply, resolve, clear, quickfix",
+        arg
+      ),
       vim.log.levels.ERROR
     )
   end

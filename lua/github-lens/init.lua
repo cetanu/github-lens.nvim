@@ -5,6 +5,7 @@ local git = require("github-lens.git")
 local gh = require("github-lens.gh")
 local comments_mod = require("github-lens.comments")
 local checks_mod = require("github-lens.checks")
+local reply_ns = vim.api.nvim_create_namespace("github_lens_reply")
 
 local function status_cache_path()
   return vim.fn.stdpath("state") .. "/github-lens/status.json"
@@ -91,6 +92,11 @@ M.state = {
   repo_root = nil,
   last_status = nil,
 }
+
+---@type integer|nil
+M._reply_buf = nil
+---@type integer|nil
+M._reply_win = nil
 
 ---Setup github-lens plugin with user options.
 ---@param opts? table User configuration options
@@ -200,6 +206,138 @@ function M.show_checks()
   checks_mod.toggle(M.state.checks, M.state.context, M.state.comments, M.config, M.state.repo_root)
 end
 
+---Reply to the unresolved review comment at the current cursor position.
+function M.reply()
+  local comment = comments_mod.find_at_cursor(0, vim.api.nvim_win_get_cursor(0)[1])
+  if not comment then
+    vim.notify("[github-lens] No unresolved comment at the cursor", vim.log.levels.INFO)
+    return
+  end
+  if comment.thread_id == nil or comment.thread_id == "" then
+    vim.notify("[github-lens] Comment has no review thread ID; refresh first", vim.log.levels.ERROR)
+    return
+  end
+
+  if M._reply_win and vim.api.nvim_win_is_valid(M._reply_win) then
+    vim.api.nvim_set_current_win(M._reply_win)
+    return
+  end
+
+  local buf = vim.api.nvim_create_buf(false, false)
+  M._reply_buf = buf
+  vim.bo[buf].buftype = "acwrite"
+  -- Keep the buffer alive briefly after :wq so the async callback can finish.
+  vim.bo[buf].bufhidden = "hide"
+  vim.bo[buf].swapfile = false
+  vim.bo[buf].filetype = "markdown"
+  vim.api.nvim_buf_set_name(buf, "GitHubLens Reply to @" .. comment.author)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "" })
+
+  vim.cmd("rightbelow vsplit")
+  local win = vim.api.nvim_get_current_win()
+  vim.api.nvim_win_set_buf(win, buf)
+  vim.api.nvim_win_set_width(win, math.max(32, math.floor(vim.o.columns * 0.35)))
+  vim.wo[win].number = true
+  vim.wo[win].relativenumber = false
+  vim.wo[win].wrap = true
+  vim.wo[win].spell = true
+  M._reply_win = win
+
+  local placeholder = vim.api.nvim_buf_set_extmark(buf, reply_ns, 0, 0, {
+    virt_text = { { "Write your reply...", "Comment" } },
+    virt_text_pos = "overlay",
+    hl_mode = "combine",
+  })
+  local clear_placeholder = function()
+    if placeholder and vim.api.nvim_buf_is_valid(buf) then
+      local body = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+      if #body > 0 and table.concat(body, "") ~= "" then
+        pcall(vim.api.nvim_buf_del_extmark, buf, reply_ns, placeholder)
+        placeholder = nil
+      end
+    end
+  end
+
+  local close_reply = function()
+    if M._reply_win and vim.api.nvim_win_is_valid(M._reply_win) then
+      vim.api.nvim_win_close(M._reply_win, true)
+    end
+    if M._reply_buf and vim.api.nvim_buf_is_valid(M._reply_buf) then
+      vim.api.nvim_buf_delete(M._reply_buf, { force = true })
+    end
+    M._reply_win = nil
+    M._reply_buf = nil
+  end
+
+  vim.api.nvim_create_autocmd("BufWriteCmd", {
+    buffer = buf,
+    callback = function()
+      if vim.b[buf].github_lens_reply_submitting then
+        return
+      end
+
+      local body = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
+      if vim.trim(body) == "" then
+        vim.notify("[github-lens] Reply cannot be empty", vim.log.levels.WARN)
+        return
+      end
+
+      vim.b[buf].github_lens_reply_submitting = true
+      -- BufWriteCmd must mark the acwrite buffer clean synchronously so :wq
+      -- can close it while the gh process runs asynchronously.
+      vim.bo[buf].modified = false
+      vim.notify("[github-lens] Posting reply...", vim.log.levels.INFO)
+      gh.reply_to_thread(comment.thread_id, body, M.state.repo_root, function(err)
+        if vim.api.nvim_buf_is_valid(buf) then
+          vim.b[buf].github_lens_reply_submitting = false
+        end
+        if err then
+          vim.notify("[github-lens] Failed to reply: " .. err, vim.log.levels.ERROR)
+          return
+        end
+
+        if vim.api.nvim_buf_is_valid(buf) then
+          vim.bo[buf].modified = false
+        end
+        vim.notify("[github-lens] Reply posted", vim.log.levels.INFO)
+        close_reply()
+        M.refresh()
+      end)
+    end,
+  })
+
+  vim.api.nvim_create_autocmd({ "InsertCharPre", "TextChanged", "TextChangedI", "TextChangedP" }, {
+    buffer = buf,
+    callback = clear_placeholder,
+  })
+
+  vim.keymap.set("n", "q", close_reply, { buffer = buf, silent = true, nowait = true })
+  vim.keymap.set("n", "<Esc>", close_reply, { buffer = buf, silent = true, nowait = true })
+  vim.notify("[github-lens] Edit reply, then use :wq to post", vim.log.levels.INFO)
+end
+
+---Resolve the unresolved review comment thread at the current cursor position.
+function M.resolve()
+  local comment = comments_mod.find_at_cursor(0, vim.api.nvim_win_get_cursor(0)[1])
+  if not comment then
+    vim.notify("[github-lens] No unresolved comment at the cursor", vim.log.levels.INFO)
+    return
+  end
+  if comment.thread_id == nil or comment.thread_id == "" then
+    vim.notify("[github-lens] Comment has no review thread ID; refresh first", vim.log.levels.ERROR)
+    return
+  end
+
+  gh.resolve_thread(comment.thread_id, M.state.repo_root, function(err)
+    if err then
+      vim.notify("[github-lens] Failed to resolve thread: " .. err, vim.log.levels.ERROR)
+      return
+    end
+    vim.notify("[github-lens] Review thread resolved", vim.log.levels.INFO)
+    M.refresh()
+  end)
+end
+
 ---Alias for show_checks() to toggle status buffer.
 function M.status()
   M.show_checks()
@@ -212,6 +350,11 @@ function M.clear()
   M.state.checks = {}
   comments_mod.clear()
   checks_mod.clear()
+  if M._reply_win and vim.api.nvim_win_is_valid(M._reply_win) then
+    vim.api.nvim_win_close(M._reply_win, true)
+  end
+  M._reply_win = nil
+  M._reply_buf = nil
   M.state.last_status = nil
   vim.notify("[github-lens] Cleared comments and checks", vim.log.levels.INFO)
 end

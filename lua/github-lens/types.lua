@@ -12,6 +12,7 @@
 
 ---@class GitHubLens.Comment
 ---@field id string
+---@field thread_id string
 ---@field author string
 ---@field body string
 ---@field path string

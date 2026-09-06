@@ -151,6 +151,19 @@ function M.render_buffer(bufnr)
   end
 end
 
+---Find the unresolved comment at a buffer line.
+---@param bufnr integer
+---@param line integer 1-based buffer line
+---@return GitHubLens.Comment|nil
+function M.find_at_cursor(bufnr, line)
+  for _, comment in ipairs(M._cached_comments) do
+    if comment.line == line and buffer_matches_path(bufnr, comment.path, M._repo_root) then
+      return comment
+    end
+  end
+  return nil
+end
+
 ---Store comments and render into all currently loaded buffers.
 ---@param comments GitHubLens.Comment[]
 ---@param repo_root? string

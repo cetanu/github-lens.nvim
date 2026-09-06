@@ -71,6 +71,8 @@ require("github-lens").setup({
 | `:GitHubLens refresh`  | Refresh data                               |
 | `:GitHubLens status`   | Toggle the status window                   |
 | `:GitHubLens quickfix` | Open unresolved comments in quickfix       |
+| `:GitHubLens reply`    | Open a reply buffer at the cursor           |
+| `:GitHubLens resolve`  | Resolve the comment thread at the cursor   |
 | `:GitHubLens clear`    | Clear comments and close the status window |
 
 ## Controls within the window
@@ -84,7 +86,8 @@ The status window provides a interface with collapsible sections:
 | `<Tab>`       | Collapse/expand current section or file     |
 | `y`           | Yank URL (or comment location) to clipboard |
 | `s`           | Toggle display of successful CI checks      |
-| `r`           | Refresh comments and checks                 |
+| `r`           | Refresh, or open a reply buffer             |
+| `x`           | Resolve the selected comment thread         |
 | `]` / `[`     | Jump to next / previous actionable item     |
 | `qf`          | Open unresolved comments in quickfix list   |
 | `q` / `<Esc>` | Close window                                |

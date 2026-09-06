@@ -31,6 +31,8 @@ checks in a status window.
     Refresh data and open the status window. With a subcommand:
     - refresh  Refresh pull request comments and checks.
     - status   Toggle the status window.
+    - reply    Open a reply buffer for the unresolved comment at the cursor.
+    - resolve  Resolve the unresolved comment thread at the cursor.
     - quickfix Open unresolved comments in quickfix.
     - clear    Clear comments and close the status window.
 
@@ -92,7 +94,8 @@ These controls are fixed and are not configurable.
 - <Tab>      Toggle fold for current section or file.
 - y          Yank URL (or comment location) to clipboard.
 - s          Toggle showing passed CI checks.
-- r          Refresh comments and checks.
+- r          Refresh comments and checks; open a reply buffer on a comment row.
+- x          Resolve the selected comment thread (from the status window).
 - ] / [      Jump to next / previous actionable item.
 - qf         Send unresolved comments to quickfix.
 - ?          Toggle help window.

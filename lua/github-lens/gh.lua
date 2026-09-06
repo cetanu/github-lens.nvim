@@ -28,6 +28,7 @@ query($owner: String!, $repo: String!, $pr: Int!) {
     pullRequest(number: $pr) {
       reviewThreads(first: 100) {
         nodes {
+          id
           isResolved
           path
           line
@@ -116,6 +117,7 @@ query($owner: String!, $repo: String!, $pr: Int!) {
           ---@type GitHubLens.Comment
           local comment = {
             id = c.id or "",
+            thread_id = thread.id or "",
             author = (c.author and c.author.login) or "ghost",
             body = c.body or "",
             path = path,
@@ -133,6 +135,89 @@ query($owner: String!, $repo: String!, $pr: Int!) {
     vim.schedule(function()
       callback(nil, comments)
     end)
+  end)
+end
+
+---Execute a GraphQL mutation through the authenticated GitHub CLI.
+---@param mutation string
+---@param variables table<string, string>
+---@param cwd? string
+---@param callback fun(err: string|nil, data: table|nil)
+local function execute_mutation(mutation, variables, cwd, callback)
+  local cmd = { "gh", "api", "graphql" }
+  for name, value in pairs(variables) do
+    table.insert(cmd, "-F")
+    table.insert(cmd, name .. "=" .. value)
+  end
+  table.insert(cmd, "-f")
+  table.insert(cmd, "query=" .. mutation)
+
+  vim.system(cmd, { text = true, cwd = cwd }, function(out)
+    local ok, decoded = pcall(vim.json.decode, out.stdout or "")
+    if not ok or type(decoded) ~= "table" then
+      local stderr = vim.trim(out.stderr or "")
+      local err = stderr ~= "" and stderr or ("Failed to parse GraphQL response: " .. tostring(decoded))
+      vim.schedule(function()
+        callback(err, nil)
+      end)
+      return
+    end
+
+    if decoded.errors and #decoded.errors > 0 then
+      vim.schedule(function()
+        callback(decoded.errors[1].message or "GraphQL mutation error", nil)
+      end)
+      return
+    end
+
+    if out.code ~= 0 then
+      vim.schedule(function()
+        callback("gh api graphql failed with code " .. tostring(out.code), nil)
+      end)
+      return
+    end
+
+    vim.schedule(function()
+      callback(nil, decoded.data or {})
+    end)
+  end)
+end
+
+---Reply to an existing pull request review thread via the GitHub CLI.
+---@param thread_id string Review thread node ID
+---@param body string Reply body
+---@param cwd? string
+---@param callback fun(err: string|nil)
+function M.reply_to_thread(thread_id, body, cwd, callback)
+  local mutation = [[
+mutation($thread_id: ID!, $body: String!) {
+  addPullRequestReviewThreadReply(input: {
+    pullRequestReviewThreadId: $thread_id
+    body: $body
+  }) {
+    clientMutationId
+  }
+}
+]]
+  execute_mutation(mutation, { thread_id = thread_id, body = body }, cwd, function(err)
+    callback(err)
+  end)
+end
+
+---Resolve a pull request review thread via the GitHub CLI.
+---@param thread_id string Review thread node ID
+---@param cwd? string
+---@param callback fun(err: string|nil)
+function M.resolve_thread(thread_id, cwd, callback)
+  local mutation = [[
+mutation($thread_id: ID!) {
+  resolveReviewThread(input: { threadId: $thread_id }) {
+    thread { id isResolved }
+  }
+}
+]]
+  execute_mutation(mutation, { thread_id = thread_id }, cwd, function(err)
+    callback(err)
   end)
 end
 
