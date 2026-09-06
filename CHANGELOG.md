@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.1](https://github.com/cetanu/github-lens.nvim/compare/v0.2.0...v0.2.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* **ci:** release refactor and style changes ([d1ada09](https://github.com/cetanu/github-lens.nvim/commit/d1ada09152451d8b43a59101a84d69580845677f))
+
+
+### Refactors
+
+* simplify plugin controls and symbols ([e064277](https://github.com/cetanu/github-lens.nvim/commit/e064277133fa533ad5ac054757e584fa8a6255c7))
+
+
+### Styles
+
+* improve status footer hints ([a08b12c](https://github.com/cetanu/github-lens.nvim/commit/a08b12c7afdc4b4eeb28bbca8539707ef971b029))
+* use single floating window borders ([f367ef9](https://github.com/cetanu/github-lens.nvim/commit/f367ef9cd42c5afd0558493f4ac12df25ba20a1b))
+
 ## [0.2.0](https://github.com/cetanu/github-lens.nvim/compare/v0.1.0...v0.2.0) (2026-09-05)
 
 
