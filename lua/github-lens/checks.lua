@@ -532,8 +532,31 @@ function M.render()
   add_line("")
 
   -- 4. Minimal Footer Section
-  local footer_line = "  [?] Help  [<CR>] Jump/Open  [Tab] Fold  [s] Success  [r] Refresh  [q] Close"
-  add_line(footer_line, { { col_start = 2, col_end = #footer_line, hl = "GitHubLensMuted" } }, { type = "help" })
+  local footer_format = "%s %s"
+  local footer_items = {
+    { key = "?", description = "Help", hl = "GitHubLensFooterKey" },
+    { key = "r", description = "Refresh", hl = "GitHubLensFooterKey" },
+    { key = "q", description = "Close", hl = "GitHubLensFooterKey" },
+  }
+  local footer_parts = { "  " }
+  local footer_highlights = {}
+  local footer_col = 2
+  for index, item in ipairs(footer_items) do
+    local item_text = string.format(footer_format, item.key, item.description)
+    table.insert(footer_parts, item_text)
+    table.insert(footer_highlights, {
+      col_start = footer_col,
+      col_end = footer_col + #item.key + 2,
+      hl = item.hl,
+    })
+    footer_col = footer_col + #item_text
+    if index < #footer_items then
+      table.insert(footer_parts, "  ")
+      footer_col = footer_col + 2
+    end
+  end
+  local footer_line = table.concat(footer_parts)
+  add_line(footer_line, footer_highlights, { type = "help" })
 
   -- Update buffer
   local cur_win = M._win
