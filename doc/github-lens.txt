@@ -31,12 +31,8 @@ checks in a status window.
     Refresh data and open the status window. With a subcommand:
     - refresh  Refresh pull request comments and checks.
     - status   Toggle the status window.
-    - checks   Alias for `status`.
     - quickfix Open unresolved comments in quickfix.
     - clear    Clear comments and close the status window.
-
-:GitHubLensChecks                                         *:GitHubLensChecks*
-    Toggle the status window.
 
 =============================================================================
 4. Configuration                                              *github-lens-config*
@@ -51,17 +47,8 @@ checks in a status window.
         pending = "●",
         cancelled = "⊘",
         skipped = "⊘",
-        action_required = "▲",
-        section_open = "▾",
-        section_closed = "▸",
-        file_open = "▾",
-        file_closed = "▸",
+        action_required = "◆",
         comment_prefix = "│ ",
-      },
-      keymaps = {
-        toggle_checks = "<leader>pc",
-        refresh = "<leader>pr",
-        clear = "<leader>px",
       },
       window = {
         position = "bottom", -- "bottom" split or "float" centered modal
@@ -100,9 +87,9 @@ require("github-lens").quickfix()                       *github-lens.quickfix()*
 6. Keymaps                                                   *github-lens-keymaps*
 
 In the status window:
+These controls are fixed and are not configurable.
 - <CR>       Jump to comment / open URL / toggle fold.
-- <Tab>, za  Toggle fold for current section or file.
-- o          Open URL in browser.
+- <Tab>      Toggle fold for current section or file.
 - y          Yank URL (or comment location) to clipboard.
 - s          Toggle showing passed CI checks.
 - r          Refresh comments and checks.

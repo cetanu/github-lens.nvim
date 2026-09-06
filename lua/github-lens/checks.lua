@@ -38,13 +38,14 @@ local default_symbols = {
   pending = "●",
   cancelled = "⊘",
   skipped = "⊘",
-  action_required = "▲",
-  section_open = "▾",
-  section_closed = "▸",
-  file_open = "▾",
-  file_closed = "▸",
+  action_required = "◆",
   comment_prefix = "│ ",
 }
+
+local SECTION_OPEN = "▼"
+local SECTION_CLOSED = "▶"
+local FILE_OPEN = "▼"
+local FILE_CLOSED = "▶"
 
 local function display_width(text)
   return vim.fn.strdisplaywidth(text)
@@ -79,6 +80,7 @@ local function setup_highlights()
     GitHubLensPending = { link = "DiagnosticWarn", default = true },
     GitHubLensSkipped = { link = "Comment", default = true },
     GitHubLensActionRequired = { link = "DiagnosticWarn", default = true },
+    GitHubLensFooterKey = { fg = "Purple", bold = true },
     GitHubLensMuted = { link = "Comment", default = true },
     GitHubLensUrl = { link = "Underlined", default = true },
   }
@@ -183,7 +185,7 @@ local function get_check_status_info(check, symbols)
     local lbl = check.conclusion == "TIMED_OUT" and "timed out" or "failed"
     return symbols.fail or "✖", "GitHubLensFail", lbl
   elseif check.conclusion == "ACTION_REQUIRED" then
-    return symbols.action_required or "▲", "GitHubLensActionRequired", "action required"
+    return symbols.action_required or "◆", "GitHubLensActionRequired", "action required"
   else
     local lbl = (check.status and check.status ~= "") and string.lower(check.status:gsub("_", " ")) or "pending"
     return symbols.pending or "●", "GitHubLensPending", lbl
@@ -203,7 +205,6 @@ function M.toggle_help()
     "",
     " <CR>      Jump to comment / Open URL / Toggle fold",
     " <Tab>     Toggle fold for section or file",
-    " o         Open URL in browser",
     " y         Yank URL to system clipboard",
     " s         Toggle showing passed CI checks",
     " r         Refresh pull request data",
@@ -339,7 +340,7 @@ function M.render()
   end
 
   local is_checks_folded = M._folded_sections["checks"] == true
-  local ch_icon = is_checks_folded and (symbols.section_closed or "▸") or (symbols.section_open or "▾")
+  local ch_icon = is_checks_folded and SECTION_CLOSED or SECTION_OPEN
   local checks_header_line = string.format("%s %s", ch_icon, checks_summary)
   add_line(checks_header_line, {
     { col_start = 0, col_end = #ch_icon, hl = "GitHubLensMuted" },
@@ -468,7 +469,7 @@ function M.render()
   end
 
   local is_comments_folded = M._folded_sections["comments"] == true
-  local cm_icon = is_comments_folded and (symbols.section_closed or "▸") or (symbols.section_open or "▾")
+  local cm_icon = is_comments_folded and SECTION_CLOSED or SECTION_OPEN
   local cm_header_line = string.format("%s %s", cm_icon, comments_summary)
   add_line(cm_header_line, {
     { col_start = 0, col_end = #cm_icon, hl = "GitHubLensMuted" },
@@ -488,7 +489,7 @@ function M.render()
       for _, path in ipairs(file_order) do
         local file_comments = by_file[path]
         local is_file_folded = M._folded_files[path] == true
-        local f_icon = is_file_folded and (symbols.file_closed or "▸") or (symbols.file_open or "▾")
+        local f_icon = is_file_folded and FILE_CLOSED or FILE_OPEN
         local file_line = string.format("  %s %s (%d)", f_icon, path, #file_comments)
         local f_action = { type = "file_fold", path = path }
         local f_hls = {
@@ -693,18 +694,6 @@ function M.open(checks, ctx, comments, config, repo_root)
   end
 
   vim.keymap.set("n", "<Tab>", toggle_current_fold, keymap_opts)
-  vim.keymap.set("n", "za", toggle_current_fold, keymap_opts)
-
-  vim.keymap.set("n", "o", function()
-    local cur_row = vim.api.nvim_win_get_cursor(win)[1]
-    local action = M._line_actions and M._line_actions[cur_row]
-    if action and action.url and action.url ~= "" then
-      vim.ui.open(action.url)
-      vim.notify("[github-lens] Opening URL: " .. action.url, vim.log.levels.INFO)
-    else
-      vim.notify("[github-lens] No URL associated with this item", vim.log.levels.INFO)
-    end
-  end, keymap_opts)
 
   vim.keymap.set("n", "y", function()
     local cur_row = vim.api.nvim_win_get_cursor(win)[1]

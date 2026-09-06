@@ -318,7 +318,6 @@ local function run_tests()
     comments_mod.set_comments(fake_comments, repo_root, {
       virtual_lines = true,
       comment_hl = "DiagnosticSignInfo",
-      keymaps = {},
     })
 
     -- Check extmarks in buffer
@@ -343,7 +342,7 @@ local function run_tests()
     vim.api.nvim_buf_delete(buf, { force = true })
   end)
 
-  -- 6. Checks & Comments Status split UI window, layout, and keymaps
+  -- 6. Checks & Comments Status split UI window and built-in keymaps
   test("Status UI renders bottom split buffer with checks and comments", function()
     local checks_mod = require("github-lens.checks")
 
@@ -409,11 +408,6 @@ local function run_tests()
     vim.api.nvim_win_set_cursor(checks_mod._win, { 4, 0 })
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<CR>", true, false, true), "x", false)
     assert_eq(opened_url, "https://github.com/org/repo/actions/runs/12345", "opened check URL on CR")
-
-    -- Test opening URL via 'o'
-    opened_url = nil
-    vim.api.nvim_feedkeys("o", "x", false)
-    assert_eq(opened_url, "https://github.com/org/repo/actions/runs/12345", "opened check URL on o")
 
     -- Test yanking URL via 'y'
     vim.api.nvim_feedkeys("y", "x", false)
@@ -495,21 +489,31 @@ local function run_tests()
   end)
 
   -- 7. End-to-end Setup & Init
-  test("setup() applies options and keymaps", function()
+  test("setup() applies options without configurable keymaps", function()
     local github_lens = require("github-lens")
     github_lens.setup({
       virtual_lines = false,
       comment_hl = "Comment",
       keymaps = {
         refresh = "<leader>tR",
-        toggle_checks = "<leader>tC",
-        clear = "<leader>tX",
+      },
+      symbols = {
+        action_required = "!",
+        section_open = "custom",
+        section_closed = "custom",
+        file_open = "custom",
+        file_closed = "custom",
       },
     })
 
     assert_eq(github_lens.config.virtual_lines, false, "virtual_lines option")
     assert_eq(github_lens.config.comment_hl, "Comment", "comment_hl option")
-    assert_eq(github_lens.config.keymaps.refresh, "<leader>tR", "refresh keymap")
+    assert_true(github_lens.config.keymaps == nil, "keymaps are not configurable")
+    assert_eq(github_lens.config.symbols.action_required, "!", "action_required symbol remains configurable")
+    assert_true(github_lens.config.symbols.section_open == nil, "section_open is not configurable")
+    assert_true(github_lens.config.symbols.section_closed == nil, "section_closed is not configurable")
+    assert_true(github_lens.config.symbols.file_open == nil, "file_open is not configurable")
+    assert_true(github_lens.config.symbols.file_closed == nil, "file_closed is not configurable")
   end)
 
   -- 8. Subdirectory path resolution test
@@ -544,7 +548,6 @@ local function run_tests()
     comments_mod.set_comments(fake_comments, root, {
       virtual_lines = true,
       comment_hl = "DiagnosticSignInfo",
-      keymaps = {},
     })
 
     local marks = vim.api.nvim_buf_get_extmarks(sub_buf, ns_id, 0, -1, {})
@@ -581,13 +584,13 @@ local function run_tests()
   end)
 
   -- 10. Plugin user command registration
-  test("User commands :GitHubLens and :GitHubLensChecks exist and execute", function()
+  test("User command :GitHubLens exists and executes", function()
     -- Load plugin/github-lens.lua
     dofile("plugin/github-lens.lua")
 
     local commands = vim.api.nvim_get_commands({})
     assert_true(commands["GitHubLens"] ~= nil, ":GitHubLens command registered")
-    assert_true(commands["GitHubLensChecks"] ~= nil, ":GitHubLensChecks command registered")
+    assert_true(commands["GitHubLensToggle"] == nil, ":GitHubLensToggle command not registered")
   end)
 
   -- 11. Process Non-Blocking Async Verification

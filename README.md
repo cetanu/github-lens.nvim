@@ -20,7 +20,7 @@ The plugin has no Lua dependencies.
 ```lua
 {
   "cetanu/github-lens.nvim",
-  cmd = { "GitHubLens", "GitHubLensChecks" },
+  cmd = { "GitHubLens" },
   opts = {},
 }
 ```
@@ -48,17 +48,8 @@ require("github-lens").setup({
     pending = "●",
     cancelled = "⊘",
     skipped = "⊘",
-    action_required = "▲",
-    section_open = "▾",
-    section_closed = "▸",
-    file_open = "▾",
-    file_closed = "▸",
+    action_required = "◆",
     comment_prefix = "│ ",
-  },
-  keymaps = {
-    toggle_checks = "<leader>pc",
-    refresh = "<leader>pr",
-    clear = "<leader>px",
   },
   window = {
     position = "bottom", -- "bottom" split or "float" centered modal
@@ -74,32 +65,29 @@ require("github-lens").setup({
 
 ## Commands
 
-| Command | Action |
-| --- | --- |
-| `:GitHubLens` | Refresh data and open the status window |
-| `:GitHubLens refresh` | Refresh data |
-| `:GitHubLens status` | Toggle the status window |
-| `:GitHubLens checks` | Alias for `status` |
-| `:GitHubLens quickfix` | Open unresolved comments in quickfix |
-| `:GitHubLens clear` | Clear comments and close the status window |
-| `:GitHubLensChecks` | Toggle the status window |
+| Command                | Action                                     |
+| ---------------------- | ------------------------------------------ |
+| `:GitHubLens`          | Refresh data and open the status window    |
+| `:GitHubLens refresh`  | Refresh data                               |
+| `:GitHubLens status`   | Toggle the status window                   |
+| `:GitHubLens quickfix` | Open unresolved comments in quickfix       |
+| `:GitHubLens clear`    | Clear comments and close the status window |
 
-## Status Window Controls
+## Controls within the window
 
-The status window provides a clean, minimal interface with collapsible sections:
+The status window provides a interface with collapsible sections:
 
-| Key | Action |
-| --- | --- |
-| `<CR>` | Jump to comment in editor / open URL / toggle fold |
-| `<Tab>` / `za` | Toggle fold for current section or file |
-| `o` | Open PR, check, or comment URL in browser |
-| `y` | Yank URL (or comment location) to clipboard |
-| `s` | Toggle showing passed/successful CI checks |
-| `r` | Refresh PR comments and checks |
-| `]` / `[` | Jump to next / previous actionable item |
-| `qf` | Open unresolved comments in quickfix list |
-| `?` | Toggle keymap help window |
-| `q` / `<Esc>` | Close status window |
+| Key           | Action                                      |
+| ------------- | ------------------------------------------- |
+| `?`           | Toggle help window                          |
+| `<CR>`        | Jump to comment in editor / open URL        |
+| `<Tab>`       | Collapse/expand current section or file     |
+| `y`           | Yank URL (or comment location) to clipboard |
+| `s`           | Toggle display of successful CI checks      |
+| `r`           | Refresh comments and checks                 |
+| `]` / `[`     | Jump to next / previous actionable item     |
+| `qf`          | Open unresolved comments in quickfix list   |
+| `q` / `<Esc>` | Close window                                |
 
 ## Development
 
@@ -107,7 +95,7 @@ The status window provides a clean, minimal interface with collapsible sections:
 just check
 ```
 
-This runs StyLua, Selene, LuaLS, and the headless test suite.
+This runs Stylua, Selene, LuaLS, and the headless test suite.
 
 See [`:help github-lens`](doc/github-lens.txt) for the full API and options.
 

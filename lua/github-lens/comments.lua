@@ -11,7 +11,6 @@ M._repo_root = nil
 M._config = {
   virtual_lines = true,
   comment_hl = "DiagnosticSignInfo",
-  keymaps = {},
 }
 
 ---Get the comments namespace ID.

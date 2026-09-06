@@ -35,16 +35,7 @@
 ---@field cancelled? string
 ---@field skipped? string
 ---@field action_required? string
----@field section_open? string
----@field section_closed? string
----@field file_open? string
----@field file_closed? string
 ---@field comment_prefix? string
-
----@class GitHubLens.ConfigKeymaps
----@field toggle_checks? string
----@field refresh? string
----@field clear? string
 
 ---@class GitHubLens.ConfigWindow
 ---@field position? "bottom" | "float"
@@ -60,7 +51,6 @@
 ---@field virtual_lines? boolean Show multi-line comment bodies as virtual lines below target code
 ---@field comment_hl? string Highlight group for comment boundaries
 ---@field symbols? GitHubLens.ConfigSymbols Custom symbols/icons for UI
----@field keymaps? GitHubLens.ConfigKeymaps
 ---@field window? GitHubLens.ConfigWindow
 ---@field checks? GitHubLens.ConfigChecks
 

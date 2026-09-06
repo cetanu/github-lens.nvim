@@ -16,17 +16,8 @@ local default_config = {
     pending = "●",
     cancelled = "⊘",
     skipped = "⊘",
-    action_required = "▲",
-    section_open = "▾",
-    section_closed = "▸",
-    file_open = "▾",
-    file_closed = "▸",
+    action_required = "◆",
     comment_prefix = "│ ",
-  },
-  keymaps = {
-    toggle_checks = "<leader>pc",
-    refresh = "<leader>pr",
-    clear = "<leader>px",
   },
   window = {
     position = "bottom",
@@ -54,30 +45,17 @@ M.state = {
 ---@param opts? table User configuration options
 function M.setup(opts)
   if opts then
-    M.config = vim.tbl_deep_extend("force", default_config, opts)
+    local config_opts = vim.deepcopy(opts)
+    config_opts.keymaps = nil
+    if config_opts.symbols then
+      config_opts.symbols.section_open = nil
+      config_opts.symbols.section_closed = nil
+      config_opts.symbols.file_open = nil
+      config_opts.symbols.file_closed = nil
+    end
+    M.config = vim.tbl_deep_extend("force", default_config, config_opts)
   else
     M.config = vim.deepcopy(default_config)
-  end
-
-  -- Apply keymaps if configured
-  if M.config.keymaps then
-    if M.config.keymaps.refresh and M.config.keymaps.refresh ~= "" then
-      vim.keymap.set("n", M.config.keymaps.refresh, function()
-        M.refresh()
-      end, { desc = "GitHub Lens: Refresh PR comments & checks" })
-    end
-
-    if M.config.keymaps.toggle_checks and M.config.keymaps.toggle_checks ~= "" then
-      vim.keymap.set("n", M.config.keymaps.toggle_checks, function()
-        M.show_checks()
-      end, { desc = "GitHub Lens: Toggle failing CI checks window" })
-    end
-
-    if M.config.keymaps.clear and M.config.keymaps.clear ~= "" then
-      vim.keymap.set("n", M.config.keymaps.clear, function()
-        M.clear()
-      end, { desc = "GitHub Lens: Clear comments and state" })
-    end
   end
 end
 

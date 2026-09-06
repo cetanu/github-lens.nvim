@@ -7,9 +7,6 @@ local subcommands = {
   refresh = function()
     require("github-lens").refresh()
   end,
-  checks = function()
-    require("github-lens").show_checks()
-  end,
   status = function()
     require("github-lens").show_checks()
   end,
@@ -29,7 +26,7 @@ vim.api.nvim_create_user_command("GitHubLens", function(opts)
     subcommands[arg]()
   else
     vim.notify(
-      string.format("[github-lens] Unknown subcommand: '%s'. Valid options: refresh, checks, clear, quickfix", arg),
+      string.format("[github-lens] Unknown subcommand: '%s'. Valid options: refresh, status, clear, quickfix", arg),
       vim.log.levels.ERROR
     )
   end
@@ -46,10 +43,4 @@ end, {
     return matches
   end,
   desc = "GitHub Lens: Manage pull request review comments and CI checks",
-})
-
-vim.api.nvim_create_user_command("GitHubLensChecks", function()
-  require("github-lens").show_checks()
-end, {
-  desc = "GitHub Lens: Open floating window with failing and pending CI checks",
 })
