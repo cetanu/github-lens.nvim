@@ -7,7 +7,7 @@ local comments_mod = require("github-lens.comments")
 local checks_mod = require("github-lens.checks")
 
 local function status_cache_path()
-  return vim.fs.joinpath(vim.fn.stdpath("state"), "github-lens", "status.json")
+  return vim.fn.stdpath("state") .. "/github-lens/status.json"
 end
 
 ---@param repo_root string
@@ -34,7 +34,7 @@ end
 ---@param status GitHubLens.Status
 local function save_cached_status(status)
   local path = status_cache_path()
-  local cache_dir = vim.fs.dirname(path)
+  local cache_dir = vim.fn.fnamemodify(path, ":h")
   local ok = pcall(vim.fn.mkdir, cache_dir, "p")
   if not ok then
     return
