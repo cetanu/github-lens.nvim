@@ -132,6 +132,38 @@ query($owner: String!, $repo: String!, $pr: Int!) {
       end
     end
 
+    -- GitHub connection order is not a display-order contract. Give each
+    -- thread a stable position so its comments cannot be interleaved with a
+    -- different thread on the same line, then order comments within it.
+    local thread_first = {}
+    for _, comment in ipairs(comments) do
+      local first = thread_first[comment.thread_id]
+      if not first or comment.created_at < first then
+        thread_first[comment.thread_id] = comment.created_at
+      end
+    end
+
+    table.sort(comments, function(a, b)
+      if a.path ~= b.path then
+        return a.path < b.path
+      end
+      if a.line ~= b.line then
+        return a.line < b.line
+      end
+      if a.thread_id ~= b.thread_id then
+        local a_first = thread_first[a.thread_id] or a.created_at
+        local b_first = thread_first[b.thread_id] or b.created_at
+        if a_first ~= b_first then
+          return a_first < b_first
+        end
+        return a.thread_id < b.thread_id
+      end
+      if a.created_at ~= b.created_at then
+        return a.created_at < b.created_at
+      end
+      return a.id < b.id
+    end)
+
     vim.schedule(function()
       callback(nil, comments)
     end)

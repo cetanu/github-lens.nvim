@@ -156,18 +156,18 @@ local function run_tests()
                   comments = {
                     nodes = {
                       {
-                        id = "c2",
-                        author = { login = "bob" },
-                        body = "First comment\nSecond line",
-                        createdAt = "2026-09-02",
-                        url = "https://github.com/org/repo/pull/42#r2",
-                      },
-                      {
                         id = "c3",
                         author = { login = "carol" },
                         body = "Reply to first comment",
                         createdAt = "2026-09-03",
                         url = "https://github.com/org/repo/pull/42#r3",
+                      },
+                      {
+                        id = "c2",
+                        author = { login = "bob" },
+                        body = "First comment\nSecond line",
+                        createdAt = "2026-09-02",
+                        url = "https://github.com/org/repo/pull/42#r2",
                       },
                     },
                   },
@@ -377,6 +377,35 @@ local function run_tests()
     local details = marks[1][4]
     assert(details and details.virt_lines ~= nil, "virt_lines present")
     assert_eq(#details.virt_lines, 2, "2 virtual lines for multi-line comment")
+
+    comments_mod.set_comments(
+      {
+        fake_comments[1],
+        {
+          id = "c101",
+          author = "another-reviewer",
+          body = "Second comment",
+          path = "src/core.lua",
+          line = 3,
+          original_line = 3,
+          is_resolved = false,
+          created_at = "2026-09-02",
+          url = "",
+        },
+      },
+      repo_root,
+      {
+        virtual_lines = true,
+        comment_hl = "DiagnosticSignInfo",
+      }
+    )
+    local grouped_marks = vim.api.nvim_buf_get_extmarks(buf, ns_id, 0, -1, { details = true })
+    assert_eq(#grouped_marks, 1, "comments on one line share one extmark")
+    assert_eq(#grouped_marks[1][4].virt_lines, 3, "grouped virtual lines preserve both comments")
+    assert_true(
+      string.find(grouped_marks[1][4].virt_lines[3][2][1], "Second comment", 1, true) ~= nil,
+      "second comment follows first comment"
+    )
 
     -- Test persistence across reload and clear
     comments_mod.render_buffer(buf)

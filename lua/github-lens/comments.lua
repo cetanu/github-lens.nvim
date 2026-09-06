@@ -138,11 +138,25 @@ function M.render_buffer(bufnr)
     return
   end
 
+  local lines_with_comments = {}
+  local line_order = {}
   for _, comment in ipairs(M._cached_comments) do
     if buffer_matches_path(bufnr, comment.path, M._repo_root) then
       local target_line = math.max(1, math.min(comment.line or 1, line_count))
-      local virt_lines = build_virt_lines(comment, M._config)
+      if not lines_with_comments[target_line] then
+        lines_with_comments[target_line] = {}
+        table.insert(line_order, target_line)
+      end
+      local comment_lines = build_virt_lines(comment, M._config)
+      for _, virt_line in ipairs(comment_lines) do
+        table.insert(lines_with_comments[target_line], virt_line)
+      end
+    end
+  end
 
+  for _, target_line in ipairs(line_order) do
+    local virt_lines = lines_with_comments[target_line]
+    if virt_lines then
       pcall(vim.api.nvim_buf_set_extmark, bufnr, ns_id, target_line - 1, 0, {
         virt_lines = virt_lines,
         virt_lines_above = false,
