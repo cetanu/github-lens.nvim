@@ -260,6 +260,55 @@ local function run_tests()
     end
   end)
 
+  test("GH API preserves the original line for outdated comments", function()
+    local gh = require("github-lens.gh")
+    local orig_system = vim.system
+    local mock_gql_response = vim.json.encode({
+      data = {
+        repository = {
+          pullRequest = {
+            reviewThreads = {
+              nodes = {
+                {
+                  id = "thread-outdated",
+                  isResolved = false,
+                  path = "lua/changed.lua",
+                  line = vim.NIL,
+                  originalLine = 37,
+                  comments = {
+                    nodes = {
+                      { id = "old-comment", author = { login = "alice" }, body = "Still relevant" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    ---@diagnostic disable-next-line: duplicate-set-field
+    vim.system = function(_, _, on_exit)
+      on_exit({ code = 0, stdout = mock_gql_response, stderr = "" })
+      return {}
+    end
+
+    local received = nil
+    gh.fetch_unresolved_comments(42, nil, function(err, comments)
+      assert_eq(err, nil, "no error")
+      received = comments
+    end)
+    vim.wait(100, function()
+      return received ~= nil
+    end)
+    vim.system = orig_system
+
+    assert_eq(#received, 1, "outdated comment is returned")
+    assert_eq(received[1].line, 37, "JSON null current line falls back to original line")
+    assert_eq(received[1].original_line, 37, "original line is retained")
+  end)
+
   -- 4. GH API checks query & filtering
   test("GH API parses CI checks and strictly filters fail and pending", function()
     local gh = require("github-lens.gh")
