@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0](https://github.com/cetanu/github-lens.nvim/compare/v0.3.0...v0.4.0) (2026-09-07)
+
+
+### Features
+
+* compact long comment previews ([5c22525](https://github.com/cetanu/github-lens.nvim/commit/5c225252de2d91dac73e219c069db46dad85c546))
+* reply to and resolve review threads ([be0e497](https://github.com/cetanu/github-lens.nvim/commit/be0e4971ab4074ee4ea90c364144d9bff2508bdb))
+
+
+### Bug Fixes
+
+* preserve lines for outdated review comments ([3c5922a](https://github.com/cetanu/github-lens.nvim/commit/3c5922a4d9da7a57cfc5ee24596555e28c162de8))
+* preserve review comment order in buffers ([6d746da](https://github.com/cetanu/github-lens.nvim/commit/6d746dae5475ad4e8e16880adad1a49037c9dc57))
+
 ## [0.3.0](https://github.com/cetanu/github-lens.nvim/compare/v0.2.1...v0.3.0) (2026-09-06)
 
 
