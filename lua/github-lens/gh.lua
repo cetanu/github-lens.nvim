@@ -1,6 +1,17 @@
 ---@class GitHubLens.GH
 local M = {}
 
+---Return the first usable line number from GitHub's current and original positions.
+---JSON null values decode to vim.NIL, which is truthy and therefore cannot be
+---handled correctly with `current or original`.
+---@param current any
+---@param original any
+---@return integer
+local function review_line(current, original)
+  local line = tonumber(current) or tonumber(original) or 1
+  return math.max(1, math.floor(line))
+end
+
 ---Fetch unresolved PR review comments for a pull request via GitHub GraphQL API.
 ---@param pr_number integer Pull request number
 ---@param cwd_or_opts? string|table Directory or options table { cwd?: string, owner?: string, repo?: string }
@@ -108,10 +119,8 @@ query($owner: String!, $repo: String!, $pr: Int!) {
       if not thread.isResolved then
         local c_nodes = (thread.comments and thread.comments.nodes) or {}
         local path = thread.path or ""
-        local raw_line = thread.line or thread.originalLine or 1
-        local raw_orig = thread.originalLine or thread.line or 1
-        local line = math.floor(tonumber(raw_line) or 1)
-        local orig_line = math.floor(tonumber(raw_orig) or 1)
+        local line = review_line(thread.line, thread.originalLine)
+        local orig_line = review_line(thread.originalLine, thread.line)
 
         for _, c in ipairs(c_nodes) do
           ---@type GitHubLens.Comment
